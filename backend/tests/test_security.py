@@ -2,12 +2,8 @@
 import os
 os.environ.setdefault("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/gestion_mails_test")
 os.environ.setdefault("SECRET_KEY", "test_secret_key_minimum_32_characters_here_ok")
-os.environ.setdefault("ENCRYPTION_KEY", "")  # will be replaced below
-
 from cryptography.fernet import Fernet
-# Set a valid test encryption key before any imports that load settings
-if not os.environ.get("ENCRYPTION_KEY"):
-    os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())
 
 from app.core.security import (
     hash_password, verify_password,
