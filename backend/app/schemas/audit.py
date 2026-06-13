@@ -9,8 +9,8 @@ class AuditEventResponse(BaseModel):
 
     id: UUID
     orden_id: UUID
-    usuario_id: Optional[UUID]
+    usuario_id: Optional[UUID] = None
     accion: str
-    ip_origen: Optional[str]
+    ip_origen: Optional[str] = None
     timestamp: datetime
-    detalle: Optional[Any]
+    detalle: Optional[Any] = None

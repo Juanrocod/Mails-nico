@@ -21,7 +21,7 @@ class OrdenResponse(BaseModel):
     liquidacion: str
     fecha_operacion: datetime
     dj_aplicada: bool
-    dj_tipo: Optional[str]
+    dj_tipo: Optional[str] = None
     estado: str
     texto_minuta: str
     texto_editado: bool
