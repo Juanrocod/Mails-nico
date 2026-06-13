@@ -12,6 +12,7 @@ import pytest
 import pyotp
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from app.core.database import Base, get_db
@@ -22,10 +23,13 @@ from app.models.user import User
 from app.models.order import Orden, ExcelUpload
 from app.models.audit import AuditEvent, DJTemplate
 
-# SQLite in-memory engine shared across the test session
+# SQLite in-memory engine shared across the test session.
+# StaticPool ensures all connections share the same in-memory database,
+# which is required when mixing pytest fixtures with different scopes.
 _engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 
 

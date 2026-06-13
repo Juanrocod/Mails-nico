@@ -1,0 +1,90 @@
+from datetime import timedelta
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from jose import JWTError
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_totp,
+)
+from app.schemas.auth import (
+    LoginRequest,
+    PendingTokenResponse,
+    VerifyTOTPRequest,
+    TokenResponse,
+    RefreshRequest,
+)
+from app.services.auth import authenticate_user
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/login", response_model=PendingTokenResponse)
+def login(body: LoginRequest, db: Session = Depends(get_db)):
+    user = authenticate_user(body.username, body.password, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    pending_token = create_access_token(
+        subject=str(user.id),
+        expires_delta=timedelta(minutes=5),
+    )
+    return PendingTokenResponse(
+        pending_token=pending_token,
+        message="Ingrese el código de su autenticador",
+    )
+
+
+@router.post("/verify-totp", response_model=TokenResponse)
+def verify_totp_endpoint(body: VerifyTOTPRequest, db: Session = Depends(get_db)):
+    try:
+        payload = decode_token(body.pending_token)
+        if payload.get("type") != "access":
+            raise ValueError
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Token pendiente inválido o expirado")
+
+    from app.models.user import User
+    user = db.query(User).filter(User.id == UUID(payload["sub"]), User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    if not verify_totp(user.totp_secret, body.code):
+        raise HTTPException(status_code=401, detail="Código 2FA inválido")
+
+    access_token = create_access_token(
+        subject=str(user.id),
+        expires_delta=timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS),
+    )
+    refresh_token = create_refresh_token(subject=str(user.id))
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(body: RefreshRequest):
+    try:
+        payload = decode_token(body.refresh_token)
+        if payload.get("type") != "refresh":
+            raise ValueError
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Refresh token inválido")
+
+    access_token = create_access_token(
+        subject=payload["sub"],
+        expires_delta=timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS),
+    )
+    refresh_token = create_refresh_token(subject=payload["sub"])
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
