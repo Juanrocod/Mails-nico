@@ -117,3 +117,38 @@ def auth_headers(client, test_user):
     )
     assert r.status_code == 200, f"TOTP verification failed: {r.text}"
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.fixture
+def make_valid_excel():
+    """Returns bytes of a valid single-row .xlsx for upload tests."""
+    import io
+    import openpyxl
+    from datetime import datetime
+    from app.services.excel_parser import EXPECTED_COLUMNS
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    headers = list(EXPECTED_COLUMNS.values())
+    for col_idx, header in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=header)
+
+    row = {
+        "cliente_nombre": "Test Cliente",
+        "cliente_email": "cliente@test.com",
+        "cuenta_comitente": "12345",
+        "cuenta_cotapartista": "67890",
+        "instrumento": "AL30",
+        "tipo": "COMPRA",
+        "cantidad": 100.0,
+        "precio": 70.50,
+        "moneda": "USD",
+        "liquidacion": "24HS",
+        "fecha_operacion": datetime(2026, 6, 13, 10, 30),
+    }
+    for col_idx, key in enumerate(EXPECTED_COLUMNS.keys(), 1):
+        ws.cell(row=2, column=col_idx, value=row[key])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
