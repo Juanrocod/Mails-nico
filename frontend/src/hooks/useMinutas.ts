@@ -20,8 +20,8 @@ export function useAprobarMinuta() {
   return useMutation({
     mutationFn: aprobarMinuta,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['minutas', 'BORRADOR'] })
-      qc.invalidateQueries({ queryKey: ['minutas', 'APROBADO'] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'BORRADOR' as EstadoMinuta] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'APROBADO' as EstadoMinuta] })
     },
   })
 }
@@ -31,8 +31,8 @@ export function useMarcarEnviada() {
   return useMutation({
     mutationFn: marcarEnviada,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['minutas', 'APROBADO'] })
-      qc.invalidateQueries({ queryKey: ['minutas', 'ENVIADO'] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'APROBADO' as EstadoMinuta] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'ENVIADO' as EstadoMinuta] })
     },
   })
 }
@@ -42,9 +42,9 @@ export function useRegistrarConfirmacion() {
   return useMutation({
     mutationFn: registrarConfirmacion,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['minutas', 'ENVIADO'] })
-      qc.invalidateQueries({ queryKey: ['minutas', 'ALERTA'] })
-      qc.invalidateQueries({ queryKey: ['minutas', 'CONFIRMADO'] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'ENVIADO' as EstadoMinuta] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'ALERTA' as EstadoMinuta] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'CONFIRMADO' as EstadoMinuta] })
     },
   })
 }
@@ -55,7 +55,7 @@ export function useEditarTexto() {
     mutationFn: ({ ordenId, texto }: { ordenId: string; texto: string }) =>
       editarTexto(ordenId, texto),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['minutas', 'BORRADOR'] })
+      qc.invalidateQueries({ queryKey: ['minutas', 'BORRADOR' as EstadoMinuta] })
     },
   })
 }

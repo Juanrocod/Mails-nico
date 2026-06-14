@@ -2,6 +2,7 @@ import axios from 'axios'
 
 let accessToken: string | null = null
 let refreshToken: string | null = null
+let onUnauthenticated: (() => void) | null = null
 
 export function setTokens(access: string, refresh: string): void {
   accessToken = access
@@ -15,6 +16,10 @@ export function clearTokens(): void {
 
 export function getAccessToken(): string | null {
   return accessToken
+}
+
+export function setUnauthenticatedHandler(fn: () => void): void {
+  onUnauthenticated = fn
 }
 
 export const api = axios.create({
@@ -31,7 +36,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config
+    const originalRequest = error.config as typeof error.config & { _retry?: boolean }
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
@@ -48,7 +53,8 @@ api.interceptors.response.use(
         return api(originalRequest)
       } catch {
         clearTokens()
-        window.location.href = '/login'
+        onUnauthenticated?.()
+        return Promise.reject(error)
       }
     }
     return Promise.reject(error)
