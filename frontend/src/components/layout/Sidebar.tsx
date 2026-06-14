@@ -1,16 +1,8 @@
+// frontend/src/components/layout/Sidebar.tsx
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  FileText,
-  CheckCircle2,
-  Send,
-  CheckCircle,
-  AlertTriangle,
-  ClipboardList,
-  Upload,
-  LogOut,
-} from 'lucide-react'
+import { FileText, Send, FileEdit, Settings2, Upload, LogOut } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
@@ -29,26 +21,16 @@ function useBadgeCount(estado: EstadoMinuta): number {
   return data?.total ?? 0
 }
 
-const NAV_ITEMS = [
-  { to: '/dashboard/borradores', label: 'Borradores', icon: FileText, badge: 'BORRADOR' as EstadoMinuta },
-  { to: '/dashboard/aprobados', label: 'Aprobados', icon: CheckCircle2, badge: 'APROBADO' as EstadoMinuta },
-  { to: '/dashboard/enviados', label: 'Enviados', icon: Send, badge: 'ENVIADO' as EstadoMinuta },
-  { to: '/dashboard/confirmados', label: 'Confirmados', icon: CheckCircle, badge: null },
-  { to: '/dashboard/alertas', label: 'Alertas', icon: AlertTriangle, badge: 'ALERTA' as EstadoMinuta },
-]
-
 function NavItem({
   to,
   label,
   icon: Icon,
   count,
-  isAlert,
 }: {
   to: string
   label: string
   icon: React.ElementType
-  count: number
-  isAlert?: boolean
+  count?: number
 }) {
   return (
     <NavLink
@@ -63,14 +45,11 @@ function NavItem({
       }
     >
       <span className="flex items-center gap-2">
-        <Icon className={cn('h-4 w-4 shrink-0', isAlert && 'text-red-500')} />
+        <Icon className="h-4 w-4 shrink-0" />
         {label}
       </span>
-      {count > 0 && (
-        <Badge
-          variant="secondary"
-          className={cn('text-xs tabular-nums', isAlert && 'bg-red-100 text-red-700')}
-        >
+      {count != null && count > 0 && (
+        <Badge variant="secondary" className="text-xs tabular-nums">
           {count}
         </Badge>
       )}
@@ -81,13 +60,8 @@ function NavItem({
 export default function Sidebar() {
   const { handleLogout } = useAuth()
   const [uploadOpen, setUploadOpen] = useState(false)
-
-  const counts: Record<string, number> = {
-    BORRADOR: useBadgeCount('BORRADOR'),
-    APROBADO: useBadgeCount('APROBADO'),
-    ENVIADO: useBadgeCount('ENVIADO'),
-    ALERTA: useBadgeCount('ALERTA'),
-  }
+  const borradores = useBadgeCount('BORRADOR')
+  const enviados = useBadgeCount('ENVIADO')
 
   return (
     <>
@@ -98,31 +72,11 @@ export default function Sidebar() {
         </div>
 
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, label, icon, badge }) => (
-            <NavItem
-              key={to}
-              to={to}
-              label={label}
-              icon={icon}
-              count={badge ? counts[badge] : 0}
-              isAlert={badge === 'ALERTA'}
-            />
-          ))}
+          <NavItem to="/dashboard/borradores" label="Borradores" icon={FileText} count={borradores} />
+          <NavItem to="/dashboard/enviados" label="Enviados" icon={Send} count={enviados} />
           <Separator className="my-2" />
-          <NavLink
-            to="/dashboard/audit"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                isActive
-                  ? 'bg-slate-100 text-slate-900 font-medium'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              )
-            }
-          >
-            <ClipboardList className="h-4 w-4 shrink-0" />
-            Audit Trail
-          </NavLink>
+          <NavItem to="/dashboard/plantilla" label="Plantilla Estándar" icon={FileEdit} />
+          <NavItem to="/dashboard/config-dj" label="Config DJ" icon={Settings2} />
         </nav>
 
         <div className="p-3 border-t border-slate-100 space-y-2">
