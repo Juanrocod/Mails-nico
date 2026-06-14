@@ -1,5 +1,48 @@
-backend/venv/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables — NEVER commit
+.env
+.env.local
+.env.*.local
 backend/.env
-**/__pycache__/
-**/*.pyc
-**/.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Frontend (para cuando llegue)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Logs
+*.log
+
+# Claude Code — archivos personales
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agent-memory-local/
