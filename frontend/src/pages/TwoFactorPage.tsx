@@ -16,7 +16,7 @@ export default function TwoFactorPage() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<FormValues>()
 
   async function onSubmit(data: FormValues) {
@@ -43,13 +43,16 @@ export default function TwoFactorPage() {
           className="space-y-4 bg-white p-6 rounded-lg border border-slate-200 shadow-sm"
         >
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Código de 6 dígitos</label>
+            <label htmlFor="code" className="text-sm font-medium text-slate-700">
+              Código de 6 dígitos
+            </label>
             <Input
+              id="code"
               {...register('code', {
-                required: true,
-                minLength: 6,
-                maxLength: 6,
-                pattern: /^\d{6}$/,
+                required: 'El código es obligatorio',
+                minLength: { value: 6, message: 'El código debe tener 6 dígitos' },
+                maxLength: { value: 6, message: 'El código debe tener 6 dígitos' },
+                pattern: { value: /^\d{6}$/, message: 'Solo se aceptan números' },
               })}
               placeholder="000000"
               inputMode="numeric"
@@ -57,10 +60,15 @@ export default function TwoFactorPage() {
               className="text-center text-xl tracking-[0.5em]"
               maxLength={6}
             />
+            {errors.code && (
+              <p className="text-xs text-red-600">{errors.code.message}</p>
+            )}
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+              {error}
+            </p>
           )}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

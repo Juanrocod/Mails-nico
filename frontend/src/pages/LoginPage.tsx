@@ -15,7 +15,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<FormValues>()
 
   async function onSubmit(data: FormValues) {
@@ -40,26 +40,40 @@ export default function LoginPage() {
           className="space-y-4 bg-white p-6 rounded-lg border border-slate-200 shadow-sm"
         >
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Usuario</label>
+            <label htmlFor="username" className="text-sm font-medium text-slate-700">
+              Usuario
+            </label>
             <Input
-              {...register('username', { required: true })}
+              id="username"
+              {...register('username', { required: 'El usuario es obligatorio' })}
               placeholder="usuario"
               autoComplete="username"
             />
+            {errors.username && (
+              <p className="text-xs text-red-600">{errors.username.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Contraseña</label>
+            <label htmlFor="password" className="text-sm font-medium text-slate-700">
+              Contraseña
+            </label>
             <Input
-              {...register('password', { required: true })}
+              id="password"
+              {...register('password', { required: 'La contraseña es obligatoria' })}
               type="password"
               placeholder="••••••••"
               autoComplete="current-password"
             />
+            {errors.password && (
+              <p className="text-xs text-red-600">{errors.password.message}</p>
+            )}
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+              {error}
+            </p>
           )}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

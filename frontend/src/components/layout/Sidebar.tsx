@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   FileText,
@@ -16,7 +16,7 @@ import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
 import { cn } from '../../lib/utils'
 import { fetchMinutas } from '../../services/minutas'
-import { clearTokens } from '../../services/api'
+import { useAuth } from '../../hooks/useAuth'
 import ExcelUploadModal from '../upload/ExcelUploadModal'
 import type { EstadoMinuta } from '../../types/domain'
 
@@ -79,7 +79,7 @@ function NavItem({
 }
 
 export default function Sidebar() {
-  const navigate = useNavigate()
+  const { handleLogout } = useAuth()
   const [uploadOpen, setUploadOpen] = useState(false)
 
   const counts: Record<string, number> = {
@@ -87,11 +87,6 @@ export default function Sidebar() {
     APROBADO: useBadgeCount('APROBADO'),
     ENVIADO: useBadgeCount('ENVIADO'),
     ALERTA: useBadgeCount('ALERTA'),
-  }
-
-  function handleLogout() {
-    clearTokens()
-    navigate('/login')
   }
 
   return (
