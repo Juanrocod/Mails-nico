@@ -61,10 +61,10 @@ def test_refresh_returns_new_access_token(client, test_user):
 
 
 def test_protected_endpoint_no_token(client):
-    r = client.get("/dashboard/borradores")
+    r = client.get("/session/minutas")
     assert r.status_code == 403
 
 
 def test_protected_endpoint_with_valid_token(client, auth_headers):
-    r = client.get("/dashboard/borradores", headers=auth_headers)
+    r = client.get("/session/minutas", headers=auth_headers)
     assert r.status_code == 200
