@@ -14,15 +14,20 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  function validatePassword(p: string): string | null {
+    if (p.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+    if (!/[A-Z]/.test(p)) return 'La contraseña debe tener al menos una mayúscula'
+    if (!/[0-9]/.test(p)) return 'La contraseña debe tener al menos un número'
+    return null
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    const pwError = validatePassword(password)
+    if (pwError) { setError(pwError); return }
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden')
-      return
-    }
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
       return
     }
     setLoading(true)
@@ -75,6 +80,9 @@ export default function ResetPasswordPage() {
               required
               autoComplete="new-password"
             />
+            <p className="text-xs text-slate-400 mt-1">
+              Mínimo 8 caracteres, una mayúscula y un número.
+            </p>
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Confirmar contraseña</label>

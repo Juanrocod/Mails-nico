@@ -29,15 +29,20 @@ export default function ChangePasswordModal({ open, onClose }: Props) {
     onClose()
   }
 
+  function validatePassword(p: string): string | null {
+    if (p.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+    if (!/[A-Z]/.test(p)) return 'La contraseña debe tener al menos una mayúscula'
+    if (!/[0-9]/.test(p)) return 'La contraseña debe tener al menos un número'
+    return null
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    const pwError = validatePassword(newPassword)
+    if (pwError) { setError(pwError); return }
     if (newPassword !== confirmPassword) {
       setError('Las contraseñas nuevas no coinciden')
-      return
-    }
-    if (newPassword.length < 8) {
-      setError('La nueva contraseña debe tener al menos 8 caracteres')
       return
     }
     setLoading(true)
@@ -91,6 +96,9 @@ export default function ChangePasswordModal({ open, onClose }: Props) {
                 required
                 autoComplete="new-password"
               />
+              <p className="text-xs text-slate-400 mt-1">
+                Mínimo 8 caracteres, una mayúscula y un número.
+              </p>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-600">Confirmar nueva contraseña</label>
