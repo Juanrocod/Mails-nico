@@ -12,7 +12,7 @@ from app.schemas.session import (
     PlantillaSchema,
     ConfigDJSchema,
 )
-from app.services import session_store
+from app.services import session_store, db_config
 
 router = APIRouter(tags=["session"])
 
@@ -59,7 +59,7 @@ def get_plantilla(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    texto = session_store.get_plantilla(str(current_user.id))
+    texto = db_config.load_plantilla(db)
     return PlantillaSchema(texto=texto)
 
 
@@ -69,7 +69,7 @@ def patch_plantilla(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session_store.set_plantilla(str(current_user.id), body.texto)
+    db_config.save_plantilla(db, body.texto)
     return body
 
 
@@ -78,7 +78,7 @@ def get_config_dj(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cfg = session_store.get_config_dj(str(current_user.id))
+    cfg = db_config.load_config_dj(db)
     return ConfigDJSchema(activa=cfg.activa, texto_alerta=cfg.texto_alerta)
 
 
@@ -88,5 +88,13 @@ def patch_config_dj(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session_store.set_config_dj(str(current_user.id), body.activa, body.texto_alerta)
+    current_cfg = db_config.load_config_dj(db)
+    updated_cfg = db_config.ConfigDJData(
+        activa=body.activa,
+        incluir_texto_en_minuta=current_cfg.incluir_texto_en_minuta,
+        texto_alerta=body.texto_alerta,
+        reglas=current_cfg.reglas,
+        logica=current_cfg.logica,
+    )
+    db_config.save_config_dj(db, updated_cfg)
     return body

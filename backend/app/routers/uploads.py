@@ -41,7 +41,7 @@ def upload_excel(
         raise HTTPException(status_code=400, detail=str(exc))
 
     user_id = str(current_user.id)
-    config = session_store.get_config_dj(user_id)
+    config = db_config.load_config_dj(db)
     now = datetime.now(timezone.utc)
 
     minutas: list[MinutaSession] = []

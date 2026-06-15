@@ -2,19 +2,13 @@
 import pytest
 from datetime import datetime
 from app.services.session_store import (
-    get_session,
     clear_session,
     add_minutas,
     get_minutas,
     get_minuta,
     update_minuta_texto,
     marcar_enviada,
-    get_plantilla,
-    set_plantilla,
-    get_config_dj,
-    set_config_dj,
     MinutaSession,
-    DEFAULT_PLANTILLA,
 )
 
 
@@ -110,35 +104,8 @@ def test_marcar_enviada_unknown_returns_none():
     assert marcar_enviada(USER, "nope") is None
 
 
-def test_plantilla_default():
-    txt = get_plantilla(USER)
-    assert txt == DEFAULT_PLANTILLA
-
-
-def test_set_plantilla():
-    set_plantilla(USER, "nueva plantilla")
-    assert get_plantilla(USER) == "nueva plantilla"
-
-
-def test_config_dj_default():
-    cfg = get_config_dj(USER)
-    assert cfg.activa is False
-    assert cfg.texto_alerta == ""
-
-
-def test_set_config_dj():
-    set_config_dj(USER, activa=True, texto_alerta="Declaración requerida")
-    cfg = get_config_dj(USER)
-    assert cfg.activa is True
-    assert cfg.texto_alerta == "Declaración requerida"
-
-
-def test_clear_session_resets_everything():
+def test_clear_session_resets_minutas():
     m = _make_minuta()
     add_minutas(USER, [m])
-    set_plantilla(USER, "algo")
-    set_config_dj(USER, activa=True, texto_alerta="algo")
     clear_session(USER)
     assert get_minutas(USER, "BORRADOR") == []
-    assert get_plantilla(USER) == DEFAULT_PLANTILLA
-    assert get_config_dj(USER).activa is False
