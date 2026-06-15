@@ -26,6 +26,7 @@ export default function RegisterPage() {
     if (p.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
     if (!/[A-Z]/.test(p)) return 'La contraseña debe tener al menos una mayúscula'
     if (!/[0-9]/.test(p)) return 'La contraseña debe tener al menos un número'
+    if (!/[^a-zA-Z0-9]/.test(p)) return 'La contraseña debe tener al menos un carácter especial (!@#$...)'
     return null
   }
 
@@ -127,7 +128,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
               />
               <p className="text-xs text-slate-400 mt-1">
-                Mínimo 8 caracteres, una mayúscula y un número.
+                Mínimo 8 caracteres, una mayúscula, un número y un carácter especial (!@#$...).
               </p>
             </div>
             <div className="space-y-1.5">
