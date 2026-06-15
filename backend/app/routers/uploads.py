@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.session import UploadMVPResponse, RowErrorSchema, MinutaSchema
-from app.services.dj_engine import get_dj_texto
+from app.services.dj_engine import evaluar_reglas, resolver_dj_texto
 from app.services.excel_parser import parse_excel_file
 from app.services.minuta_generator import generate_minuta_text
 from app.services import session_store
@@ -42,11 +42,21 @@ def upload_excel(
 
     user_id = str(current_user.id)
     config = session_store.get_config_dj(user_id)
-    dj_texto = get_dj_texto(config.activa, config.texto_alerta)
     now = datetime.now(timezone.utc)
 
     minutas: list[MinutaSession] = []
     for parsed in parse_result.ordenes:
+        datos_orden = {
+            "cliente_nombre": parsed.cliente_nombre,
+            "instrumento": parsed.instrumento,
+            "tipo": parsed.tipo,
+            "cantidad": parsed.cantidad,
+            "precio": parsed.precio,
+            "moneda": parsed.moneda,
+            "liquidacion": parsed.liquidacion,
+        }
+        dj_aplica = evaluar_reglas(config, datos_orden)
+        dj_texto = resolver_dj_texto(config, datos_orden) if dj_aplica else None
         texto = generate_minuta_text(
             cliente_nombre=parsed.cliente_nombre,
             cuenta_comitente=parsed.cuenta_comitente,
@@ -73,7 +83,7 @@ def upload_excel(
             moneda=parsed.moneda,
             liquidacion=parsed.liquidacion,
             fecha_operacion=parsed.fecha_operacion,
-            dj_aplicada=config.activa,
+            dj_aplicada=dj_aplica,
             dj_texto=dj_texto,
             estado="BORRADOR",
             texto_minuta=texto,
