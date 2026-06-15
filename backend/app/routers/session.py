@@ -12,7 +12,9 @@ from app.schemas.session import (
     PlantillaSchema,
     ConfigDJSchema,
 )
-from app.services import session_store, db_config
+from app.services import session_store
+from app.services import db_config
+from app.services.db_config import ConfigDJData
 
 router = APIRouter(tags=["session"])
 
@@ -23,8 +25,7 @@ def get_session_minutas(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    user_id = str(current_user.id)
-    minutas = session_store.get_minutas(user_id, estado)
+    minutas = session_store.get_minutas(str(current_user.id), estado)
     items = [MinutaSchema(**m.__dict__) for m in minutas]
     return SessionMinutasResponse(items=items, total=len(items))
 
@@ -59,8 +60,7 @@ def get_plantilla(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    texto = db_config.load_plantilla(db)
-    return PlantillaSchema(texto=texto)
+    return PlantillaSchema(texto=db_config.load_plantilla(db))
 
 
 @router.patch("/plantilla", response_model=PlantillaSchema)
@@ -79,7 +79,13 @@ def get_config_dj(
     current_user: User = Depends(get_current_user),
 ):
     cfg = db_config.load_config_dj(db)
-    return ConfigDJSchema(activa=cfg.activa, texto_alerta=cfg.texto_alerta)
+    return ConfigDJSchema(
+        activa=cfg.activa,
+        incluir_texto_en_minuta=cfg.incluir_texto_en_minuta,
+        texto_alerta=cfg.texto_alerta,
+        reglas=cfg.reglas,
+        logica=cfg.logica,
+    )
 
 
 @router.patch("/config/dj", response_model=ConfigDJSchema)
@@ -88,13 +94,11 @@ def patch_config_dj(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    current_cfg = db_config.load_config_dj(db)
-    updated_cfg = db_config.ConfigDJData(
+    db_config.save_config_dj(db, ConfigDJData(
         activa=body.activa,
-        incluir_texto_en_minuta=current_cfg.incluir_texto_en_minuta,
+        incluir_texto_en_minuta=body.incluir_texto_en_minuta,
         texto_alerta=body.texto_alerta,
-        reglas=current_cfg.reglas,
-        logica=current_cfg.logica,
-    )
-    db_config.save_config_dj(db, updated_cfg)
+        reglas=[r.model_dump() for r in body.reglas],
+        logica=body.logica,
+    ))
     return body

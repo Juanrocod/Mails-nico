@@ -81,7 +81,7 @@ class ReglaDJSchema(BaseModel):
 
 class ConfigDJSchema(BaseModel):
     activa: bool
-    incluir_texto_en_minuta: bool
+    incluir_texto_en_minuta: bool = False
     texto_alerta: str
-    reglas: List[ReglaDJSchema]
-    logica: Literal["OR", "AND"]
+    reglas: List[ReglaDJSchema] = []
+    logica: Literal["OR", "AND"] = "OR"
