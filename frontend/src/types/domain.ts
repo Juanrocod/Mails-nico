@@ -2,6 +2,15 @@
 export type EstadoMinuta = 'BORRADOR' | 'ENVIADO'
 export type TipoOperacion = 'COMPRA' | 'VENTA'
 export type Liquidacion = 'CI' | '24HS' | '48HS'
+export type LogicaDJ = 'OR' | 'AND'
+export type OperadorDJ = '>' | '<' | '=' | '!=' | '>=' | '<='
+export type CampoDJ = 'cantidad' | 'precio' | 'moneda' | 'liquidacion' | 'tipo' | 'instrumento'
+
+export interface ReglaDJ {
+  campo: CampoDJ
+  operador: OperadorDJ
+  valor: string
+}
 
 export interface Minuta {
   id: string
@@ -31,7 +40,10 @@ export interface SessionMinutasResponse {
 
 export interface ConfigDJ {
   activa: boolean
+  incluir_texto_en_minuta: boolean
   texto_alerta: string
+  reglas: ReglaDJ[]
+  logica: LogicaDJ
 }
 
 export interface Plantilla {
