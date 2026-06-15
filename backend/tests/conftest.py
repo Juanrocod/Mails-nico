@@ -130,6 +130,23 @@ def make_valid_excel():
 
 
 @pytest.fixture
+def reset_token(db, test_user):
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from app.models.invite_token import InviteToken
+    user, _ = test_user
+    token = InviteToken(
+        token=secrets.token_urlsafe(32),
+        tipo="reset",
+        user_id=user.id,
+        expira_en=datetime.now(timezone.utc) + timedelta(hours=48),
+    )
+    db.add(token)
+    db.flush()
+    return token
+
+
+@pytest.fixture
 def seeded_borrador_minuta(client, auth_headers, make_valid_excel):
     """Upload a valid Excel and return the UUID string of the first BORRADOR minuta."""
     r = client.post(
