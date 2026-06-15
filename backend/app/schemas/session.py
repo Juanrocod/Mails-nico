@@ -1,7 +1,10 @@
 from __future__ import annotations
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, field_validator
+from typing import Optional, List, Literal
 from datetime import datetime
+
+_CAMPOS_PERMITIDOS = {"cantidad", "precio", "moneda", "liquidacion", "tipo", "instrumento"}
+_OPERADORES_PERMITIDOS = {">", "<", "=", "!=", ">=", "<="}
 
 
 class MinutaSchema(BaseModel):
@@ -52,6 +55,33 @@ class PlantillaSchema(BaseModel):
     texto: str
 
 
+class ReglaDJSchema(BaseModel):
+    campo: str
+    operador: str
+    valor: str
+
+    @field_validator("campo")
+    @classmethod
+    def campo_valido(cls, v: str) -> str:
+        if v not in _CAMPOS_PERMITIDOS:
+            raise ValueError(
+                f"campo '{v}' no permitido. Opciones: {sorted(_CAMPOS_PERMITIDOS)}"
+            )
+        return v
+
+    @field_validator("operador")
+    @classmethod
+    def operador_valido(cls, v: str) -> str:
+        if v not in _OPERADORES_PERMITIDOS:
+            raise ValueError(
+                f"operador '{v}' no permitido. Opciones: {sorted(_OPERADORES_PERMITIDOS)}"
+            )
+        return v
+
+
 class ConfigDJSchema(BaseModel):
     activa: bool
+    incluir_texto_en_minuta: bool
     texto_alerta: str
+    reglas: List[ReglaDJSchema]
+    logica: Literal["OR", "AND"]
