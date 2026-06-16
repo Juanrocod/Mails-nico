@@ -96,7 +96,7 @@ def parse_excel_file(file_bytes: bytes) -> ParseResult:
             return _rv[field_to_col[field]]
 
         try:
-            orden = _parse_row(row_idx, get)
+            orden = _parse_row(get)
             ordenes.append(orden)
         except ValueError as e:
             errors.append(RowError(fila=row_idx, mensaje=str(e)))
@@ -104,7 +104,7 @@ def parse_excel_file(file_bytes: bytes) -> ParseResult:
     return ParseResult(ordenes=ordenes, errors=errors)
 
 
-def _parse_row(row_idx: int, get) -> OrdenParsed:
+def _parse_row(get) -> OrdenParsed:
     cliente_nombre = str(get("cliente_nombre") or "").strip()
     if not cliente_nombre:
         raise ValueError("cliente_nombre es obligatorio")

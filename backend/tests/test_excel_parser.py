@@ -1,9 +1,12 @@
 import io
+import pathlib
 import pytest
 import openpyxl
 from datetime import datetime
 
 from app.services.excel_parser import parse_excel_file, EXPECTED_COLUMNS
+
+_HERE = pathlib.Path(__file__).parent
 
 
 def make_excel(rows: list[dict]) -> bytes:
@@ -124,7 +127,7 @@ def test_parse_skips_empty_rows():
 
 def test_parse_real_excel():
     """Parsea el Excel modelo real del broker sin errores críticos."""
-    with open("tests/Operaciones_modelo.xlsx", "rb") as f:
+    with open(_HERE / "Operaciones_modelo.xlsx", "rb") as f:
         data = f.read()
     result = parse_excel_file(data)
     assert len(result.ordenes) > 0
