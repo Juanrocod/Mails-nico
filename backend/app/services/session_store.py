@@ -10,20 +10,30 @@ SESSION_TTL = timedelta(hours=12)
 @dataclass
 class MinutaSession:
     id: str
+    # Campos del Excel
     cliente_nombre: str
-    cliente_email: str
     cuenta_comitente: str
     cuenta_cotapartista: str
+    id_orden: int
+    fecha_operacion: datetime
+    fecha_liquidacion: str
+    operacion: str
     instrumento: str
-    tipo: str
+    moneda: str
     cantidad: float
     precio: float
-    moneda: str
-    liquidacion: str
-    fecha_operacion: datetime
+    monto: float
+    estado_orden: str          # Estado de la orden en la plataforma (ej: "Ejecutada")
+    cantidad_operada: float
+    precio_operado: float
+    operador: str
+    origen: str
+    asesor: str
+    requiere_conformidad: int
+    # Campos de sesión
     dj_aplicada: bool
     dj_texto: Optional[str]
-    estado: str
+    estado: str                # "BORRADOR" | "ENVIADO" | "FILTRADA"
     texto_minuta: str
     texto_editado: bool
     creado_en: datetime
@@ -54,9 +64,10 @@ def clear_session(user_id: str) -> None:
     _store.pop(user_id, None)
 
 
-def clear_borradores(user_id: str) -> None:
+def clear_borradores_y_filtradas(user_id: str) -> None:
+    """Limpia BORRADOR y FILTRADA al subir un nuevo Excel. ENVIADO no se toca."""
     session = _get_or_create(user_id)
-    session.minutas = [m for m in session.minutas if m.estado != "BORRADOR"]
+    session.minutas = [m for m in session.minutas if m.estado == "ENVIADO"]
 
 
 def add_minutas(user_id: str, minutas: list[MinutaSession]) -> None:
@@ -89,3 +100,23 @@ def marcar_enviada(user_id: str, minuta_id: str) -> Optional[MinutaSession]:
         return None
     m.estado = "ENVIADO"
     return m
+
+
+def agregar_filtrada_a_borrador(user_id: str, minuta_id: str) -> Optional[MinutaSession]:
+    """Mueve una Minuta de FILTRADA a BORRADOR."""
+    m = get_minuta(user_id, minuta_id)
+    if m is None or m.estado != "FILTRADA":
+        return None
+    m.estado = "BORRADOR"
+    return m
+
+
+def agregar_todas_filtradas_a_borrador(user_id: str) -> int:
+    """Mueve todas las Minutas FILTRADAS a BORRADOR. Retorna la cantidad movida."""
+    session = _get_or_create(user_id)
+    count = 0
+    for m in session.minutas:
+        if m.estado == "FILTRADA":
+            m.estado = "BORRADOR"
+            count += 1
+    return count
