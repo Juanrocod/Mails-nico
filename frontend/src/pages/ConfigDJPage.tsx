@@ -4,18 +4,24 @@ import { AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { Textarea } from '../components/ui/textarea'
 import { Button } from '../components/ui/button'
 import { useConfigDJ, useGuardarConfigDJ } from '../hooks/useSession'
-import type { ReglaDJ, CampoDJ, OperadorDJ, LogicaDJ } from '../types/domain'
+import type { CampoRegla, OperadorRegla, ConfigDJ } from '../types/domain'
 
-const CAMPOS: { value: CampoDJ; label: string }[] = [
+const CAMPOS: { value: CampoRegla; label: string }[] = [
+  { value: 'operacion', label: 'Operación' },
+  { value: 'operador', label: 'Operador' },
+  { value: 'origen', label: 'Origen' },
+  { value: 'estado', label: 'Estado' },
+  { value: 'moneda', label: 'Moneda' },
+  { value: 'instrumento', label: 'Instrumento' },
   { value: 'cantidad', label: 'Cantidad' },
   { value: 'precio', label: 'Precio' },
-  { value: 'moneda', label: 'Moneda' },
-  { value: 'liquidacion', label: 'Liquidación' },
-  { value: 'tipo', label: 'Tipo' },
-  { value: 'instrumento', label: 'Instrumento' },
+  { value: 'monto', label: 'Monto' },
+  { value: 'cantidad_operada', label: 'Cantidad Operada' },
+  { value: 'precio_operado', label: 'Precio Operado' },
+  { value: 'requiere_conformidad', label: 'Requiere Conformidad' },
 ]
 
-const OPERADORES: { value: OperadorDJ; label: string }[] = [
+const OPERADORES: { value: OperadorRegla; label: string }[] = [
   { value: '>=', label: '>=' },
   { value: '<=', label: '<=' },
   { value: '>', label: '>' },
@@ -37,9 +43,12 @@ const DJ_VARIABLES = [
   '{fecha_operacion}',
 ]
 
-const REGLA_VACIA: ReglaDJ = { campo: 'cantidad', operador: '>=', valor: '' }
+const REGLA_VACIA: { campo: CampoRegla; operador: OperadorRegla; valor: string } = { campo: 'cantidad', operador: '>=', valor: '' }
 
-function reglasIguales(a: ReglaDJ[], b: ReglaDJ[]): boolean {
+function reglasIguales(
+  a: { campo: CampoRegla; operador: OperadorRegla; valor: string }[],
+  b: { campo: CampoRegla; operador: OperadorRegla; valor: string }[]
+): boolean {
   if (a.length !== b.length) return false
   return a.every(
     (r, i) => r.campo === b[i].campo && r.operador === b[i].operador && r.valor === b[i].valor
@@ -54,8 +63,9 @@ export default function ConfigDJPage() {
   const [activa, setActiva] = useState(false)
   const [incluirTexto, setIncluirTexto] = useState(false)
   const [textoAlerta, setTextoAlerta] = useState('')
-  const [reglas, setReglas] = useState<ReglaDJ[]>([])
-  const [logica, setLogica] = useState<LogicaDJ>('OR')
+  const [reglas, setReglas] = useState<{ campo: CampoRegla; operador: OperadorRegla; valor: string }[]>([])
+  const [logica, setLogica] = useState<'AND' | 'OR'>('OR')
+  const [activarSiRequiereConformidad, setActivarSiRequiereConformidad] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -65,6 +75,7 @@ export default function ConfigDJPage() {
       setTextoAlerta(data.texto_alerta)
       setReglas(data.reglas)
       setLogica(data.logica)
+      setActivarSiRequiereConformidad(data.activar_si_requiere_conformidad)
     }
   }, [data])
 
@@ -73,6 +84,7 @@ export default function ConfigDJPage() {
       incluirTexto !== data.incluir_texto_en_minuta ||
       textoAlerta !== data.texto_alerta ||
       logica !== data.logica ||
+      activarSiRequiereConformidad !== data.activar_si_requiere_conformidad ||
       !reglasIguales(reglas, data.reglas)
     : false
 
@@ -101,7 +113,7 @@ export default function ConfigDJPage() {
     setSaved(false)
   }
 
-  function actualizarRegla(idx: number, campo: keyof ReglaDJ, valor: string) {
+  function actualizarRegla(idx: number, campo: 'campo' | 'operador' | 'valor', valor: string) {
     setReglas((prev) =>
       prev.map((r, i) => (i === idx ? { ...r, [campo]: valor } : r))
     )
@@ -116,6 +128,7 @@ export default function ConfigDJPage() {
         texto_alerta: textoAlerta,
         reglas,
         logica,
+        activar_si_requiere_conformidad: activarSiRequiereConformidad,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -233,7 +246,7 @@ export default function ConfigDJPage() {
                   <div className="flex items-center gap-3 pt-1">
                     <span className="text-xs text-slate-500">Lógica entre reglas:</span>
                     <div className="flex gap-2">
-                      {(['OR', 'AND'] as LogicaDJ[]).map((l) => (
+                      {(['OR', 'AND'] as const).map((l) => (
                         <button
                           key={l}
                           type="button"
@@ -250,6 +263,35 @@ export default function ConfigDJPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Toggle activar DJ si requiere conformidad */}
+              <div className="flex items-center gap-3 p-4 border border-slate-200 rounded-lg">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={activarSiRequiereConformidad}
+                  onClick={() => { setActivarSiRequiereConformidad(!activarSiRequiereConformidad); setSaved(false) }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 ${
+                    activarSiRequiereConformidad ? 'bg-slate-800' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      activarSiRequiereConformidad ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-800">
+                    {activarSiRequiereConformidad ? 'DJ automática si RequiereConformidad = 1' : 'No activar DJ automáticamente'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {activarSiRequiereConformidad
+                      ? 'Se activa la DJ automáticamente cuando la plataforma indica que la operación requiere conformidad'
+                      : 'La DJ solo se activa según las reglas configuradas arriba'}
+                  </p>
+                </div>
               </div>
 
               {/* Toggle incluir texto en minuta */}
