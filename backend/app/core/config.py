@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str
     TOTP_ISSUER: str = "GestionMails"
     ACCESS_TOKEN_EXPIRE_HOURS: int = 8
-    REFRESH_TOKEN_EXPIRE_HOURS: int = 24
+    REFRESH_TOKEN_EXPIRE_HOURS: int = 8
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
