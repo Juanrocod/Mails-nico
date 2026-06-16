@@ -101,3 +101,71 @@ def test_encrypted_string_round_trip():
         raw = result.fetchone()[0]
         assert raw != "sensitive_data"
         assert len(raw) > 20  # Fernet token is longer than plaintext
+
+
+# --- Tests de validación de contraseñas en backend (ADR-0009, sección 3) ---
+
+import pytest as _pytest
+
+
+class TestPasswordBackendValidation:
+
+    def test_register_rejects_short_password(self):
+        from app.schemas.auth import RegisterRequest
+        with _pytest.raises(Exception):
+            RegisterRequest(token="tok", username="u", password="Abc1!")
+
+    def test_register_rejects_no_uppercase(self):
+        from app.schemas.auth import RegisterRequest
+        with _pytest.raises(Exception):
+            RegisterRequest(token="tok", username="u", password="abc123!!")
+
+    def test_register_rejects_no_number(self):
+        from app.schemas.auth import RegisterRequest
+        with _pytest.raises(Exception):
+            RegisterRequest(token="tok", username="u", password="Abcdefg!")
+
+    def test_register_rejects_no_special_char(self):
+        from app.schemas.auth import RegisterRequest
+        with _pytest.raises(Exception):
+            RegisterRequest(token="tok", username="u", password="Abcdef12")
+
+    def test_register_rejects_too_long_password(self):
+        from app.schemas.auth import RegisterRequest
+        with _pytest.raises(Exception):
+            RegisterRequest(token="tok", username="u", password="A1!" + "a" * 70)
+
+    def test_register_accepts_valid_password(self):
+        from app.schemas.auth import RegisterRequest
+        req = RegisterRequest(token="tok", username="u", password="SecurePass123!")
+        assert req.password == "SecurePass123!"
+
+    def test_reset_password_rejects_weak(self):
+        from app.schemas.auth import ResetPasswordRequest
+        with _pytest.raises(Exception):
+            ResetPasswordRequest(token="tok", password="weak")
+
+    def test_change_password_rejects_weak_new_password(self):
+        from app.schemas.auth import ChangePasswordRequest
+        with _pytest.raises(Exception):
+            ChangePasswordRequest(old_password="cualquiera", new_password="weak")
+
+    def test_login_accepts_any_password(self):
+        """LoginRequest NO valida contraseña — debe aceptar cualquier string para comparar contra el hash."""
+        from app.schemas.auth import LoginRequest
+        req = LoginRequest(username="u", password="weak")
+        assert req.password == "weak"
+
+    def test_api_register_returns_422_on_weak_password(self, client):
+        r = client.post(
+            "/auth/register",
+            json={"token": "some-token", "username": "user", "password": "weak"},
+        )
+        assert r.status_code == 422
+
+    def test_api_reset_password_returns_422_on_weak_password(self, client):
+        r = client.post(
+            "/auth/reset-password",
+            json={"token": "some-token", "password": "weak"},
+        )
+        assert r.status_code == 422

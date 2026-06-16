@@ -18,6 +18,10 @@ from fastapi.testclient import TestClient
 from app.core.database import Base, get_db
 from app.core.security import hash_password, generate_totp_secret
 from app.models.user import User
+# Ensure all models are imported and registered with Base
+from app.models.invite_token import InviteToken
+from app.models.plantilla import Plantilla
+from app.models.config_dj import ConfigDJ
 
 _engine = create_engine(
     "sqlite:///:memory:",
