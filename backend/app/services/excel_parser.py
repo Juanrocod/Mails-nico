@@ -3,39 +3,51 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-# Column mapping: internal_field_name → Excel column header
-# UPDATE THIS when the broker provides the actual Excel model.
 EXPECTED_COLUMNS: dict[str, str] = {
-    "cliente_nombre": "Cliente",
-    "cliente_email": "Email",
-    "cuenta_comitente": "Cuenta Comitente",
-    "cuenta_cotapartista": "Cuenta Cotapartista",
-    "instrumento": "Instrumento",
-    "tipo": "Tipo Operación",
+    "cliente_nombre": "Descripcion",
+    "cuenta_comitente": "Comitente",
+    "cuenta_cotapartista": "Cuotapartista",
+    "id_orden": "Orden",
+    "fecha": "Fecha",
+    "hora": "Hora",
+    "fecha_liquidacion": "FechaLiquidacion",
+    "operacion": "Operacion",
+    "instrumento": "Ticker",
+    "moneda": "Moneda",
     "cantidad": "Cantidad",
     "precio": "Precio",
-    "moneda": "Moneda",
-    "liquidacion": "Liquidación",
-    "fecha_operacion": "Fecha Operación",
+    "monto": "Monto",
+    "estado": "Estado",
+    "cantidad_operada": "CantidadOperada",
+    "precio_operado": "PrecioOperado",
+    "operador": "Operador",
+    "origen": "Origen",
+    "asesor": "Asesor",
+    "requiere_conformidad": "RequiereConformidad",
 }
-
-VALID_TIPOS = {"COMPRA", "VENTA"}
-VALID_LIQUIDACIONES = {"CI", "24HS", "48HS"}
 
 
 @dataclass
 class OrdenParsed:
     cliente_nombre: str
-    cliente_email: str
     cuenta_comitente: str
     cuenta_cotapartista: str
+    id_orden: int
+    fecha_operacion: datetime
+    fecha_liquidacion: str
+    operacion: str
     instrumento: str
-    tipo: str
+    moneda: str
     cantidad: float
     precio: float
-    moneda: str
-    liquidacion: str
-    fecha_operacion: datetime
+    monto: float
+    estado: str
+    cantidad_operada: float
+    precio_operado: float
+    operador: str
+    origen: str
+    asesor: str
+    requiere_conformidad: int
 
 
 @dataclass
@@ -56,7 +68,6 @@ def parse_excel_file(file_bytes: bytes) -> ParseResult:
     wb = openpyxl.load_workbook(filename=io.BytesIO(file_bytes), data_only=True)
     ws = wb.active
 
-    # Read headers from row 1
     headers = [ws.cell(row=1, column=col).value for col in range(1, ws.max_column + 1)]
     headers = [h.strip() if isinstance(h, str) else h for h in headers]
 
@@ -66,9 +77,7 @@ def parse_excel_file(file_bytes: bytes) -> ParseResult:
     if missing:
         raise ValueError(f"Columnas faltantes: {', '.join(sorted(missing))}")
 
-    # Build column index: header name → 0-based list index
     header_to_col = {h: idx for idx, h in enumerate(headers)}
-    # Build field name → 0-based list index
     field_to_col = {
         field: header_to_col[header]
         for field, header in EXPECTED_COLUMNS.items()
@@ -80,7 +89,6 @@ def parse_excel_file(file_bytes: bytes) -> ParseResult:
     for row_idx in range(2, ws.max_row + 1):
         row_values = [ws.cell(row=row_idx, column=col).value for col in range(1, ws.max_column + 1)]
 
-        # Skip completely empty rows
         if all(v is None for v in row_values):
             continue
 
@@ -101,69 +109,79 @@ def _parse_row(row_idx: int, get) -> OrdenParsed:
     if not cliente_nombre:
         raise ValueError("cliente_nombre es obligatorio")
 
-    cliente_email = str(get("cliente_email") or "").strip()
-    if "@" not in cliente_email:
-        raise ValueError(f"cliente_email inválido: '{cliente_email}'")
-
     cuenta_comitente = str(get("cuenta_comitente") or "").strip()
     if not cuenta_comitente:
         raise ValueError("cuenta_comitente es obligatoria")
 
     cuenta_cotapartista = str(get("cuenta_cotapartista") or "").strip()
-    if not cuenta_cotapartista:
-        raise ValueError("cuenta_cotapartista es obligatoria")
+
+    raw_id = get("id_orden")
+    try:
+        id_orden = int(raw_id)
+    except (TypeError, ValueError):
+        raise ValueError(f"id_orden inválido: '{raw_id}'")
+
+    raw_fecha = str(get("fecha") or "").strip()
+    raw_hora = str(get("hora") or "").strip()
+    try:
+        fecha_operacion = datetime.strptime(f"{raw_fecha} {raw_hora}", "%d/%m/%Y %H:%M:%S")
+    except ValueError:
+        raise ValueError(f"fecha/hora inválida: '{raw_fecha} {raw_hora}'")
+
+    fecha_liquidacion = str(get("fecha_liquidacion") or "").strip()
+
+    operacion = str(get("operacion") or "").strip()
+    if not operacion:
+        raise ValueError("operacion es obligatoria")
 
     instrumento = str(get("instrumento") or "").strip()
-    if not instrumento:
-        raise ValueError("instrumento es obligatorio")
-
-    tipo = str(get("tipo") or "").strip().upper()
-    if tipo not in VALID_TIPOS:
-        raise ValueError(f"tipo inválido: '{tipo}'. Esperado: {VALID_TIPOS}")
-
-    try:
-        cantidad = float(get("cantidad"))
-    except (TypeError, ValueError):
-        raise ValueError("cantidad debe ser un número")
-    if cantidad <= 0:
-        raise ValueError(f"cantidad debe ser mayor a 0, se recibió: {cantidad}")
-
-    try:
-        precio = float(get("precio"))
-    except (TypeError, ValueError):
-        raise ValueError("precio debe ser un número")
-    if precio <= 0:
-        raise ValueError(f"precio debe ser mayor a 0, se recibió: {precio}")
 
     moneda = str(get("moneda") or "").strip()
     if not moneda:
         raise ValueError("moneda es obligatoria")
 
-    liquidacion = str(get("liquidacion") or "").strip().upper()
-    if liquidacion not in VALID_LIQUIDACIONES:
-        raise ValueError(f"liquidacion inválida: '{liquidacion}'. Esperado: {VALID_LIQUIDACIONES}")
-
-    raw_fecha = get("fecha_operacion")
-    if isinstance(raw_fecha, datetime):
-        fecha_operacion = raw_fecha
-    elif isinstance(raw_fecha, str):
+    def parse_float(field: str) -> float:
+        val = get(field)
         try:
-            fecha_operacion = datetime.fromisoformat(raw_fecha)
-        except ValueError:
-            raise ValueError(f"fecha_operacion inválida: '{raw_fecha}'")
-    else:
-        raise ValueError("fecha_operacion inválida o faltante")
+            return float(val)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field} debe ser un número, se recibió: '{val}'")
+
+    cantidad = parse_float("cantidad")
+    precio = parse_float("precio")
+    monto = parse_float("monto")
+    cantidad_operada = parse_float("cantidad_operada")
+    precio_operado = parse_float("precio_operado")
+
+    estado = str(get("estado") or "").strip()
+    operador = str(get("operador") or "").strip()
+    origen = str(get("origen") or "").strip()
+    asesor = str(get("asesor") or "").strip()
+
+    raw_rc = get("requiere_conformidad")
+    try:
+        requiere_conformidad = int(raw_rc) if raw_rc is not None else 0
+    except (TypeError, ValueError):
+        requiere_conformidad = 0
 
     return OrdenParsed(
         cliente_nombre=cliente_nombre,
-        cliente_email=cliente_email,
         cuenta_comitente=cuenta_comitente,
         cuenta_cotapartista=cuenta_cotapartista,
+        id_orden=id_orden,
+        fecha_operacion=fecha_operacion,
+        fecha_liquidacion=fecha_liquidacion,
+        operacion=operacion,
         instrumento=instrumento,
-        tipo=tipo,
+        moneda=moneda,
         cantidad=cantidad,
         precio=precio,
-        moneda=moneda,
-        liquidacion=liquidacion,
-        fecha_operacion=fecha_operacion,
+        monto=monto,
+        estado=estado,
+        cantidad_operada=cantidad_operada,
+        precio_operado=precio_operado,
+        operador=operador,
+        origen=origen,
+        asesor=asesor,
+        requiere_conformidad=requiere_conformidad,
     )
