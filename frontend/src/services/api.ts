@@ -1,17 +1,21 @@
 import axios from 'axios'
 
-let accessToken: string | null = null
-let refreshToken: string | null = null
+let accessToken: string | null = sessionStorage.getItem('access_token')
+let refreshToken: string | null = sessionStorage.getItem('refresh_token')
 let onUnauthenticated: (() => void) | null = null
 
 export function setTokens(access: string, refresh: string): void {
   accessToken = access
   refreshToken = refresh
+  sessionStorage.setItem('access_token', access)
+  sessionStorage.setItem('refresh_token', refresh)
 }
 
 export function clearTokens(): void {
   accessToken = null
   refreshToken = null
+  sessionStorage.removeItem('access_token')
+  sessionStorage.removeItem('refresh_token')
 }
 
 export function getAccessToken(): string | null {

@@ -90,7 +90,7 @@ export default function LoginPage() {
           </Button>
 
           <p className="text-center text-xs text-slate-400">
-            ¿Olvidaste tu contraseña? Pedile al administrador que genere un link de reset.
+            ¿Olvidaste tu contraseña? Contactá a tu administrador.
           </p>
         </form>
       </div>
