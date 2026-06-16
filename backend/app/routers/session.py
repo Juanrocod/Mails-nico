@@ -1,4 +1,3 @@
-# backend/app/routers/session.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,10 +10,11 @@ from app.schemas.session import (
     EditTextoRequest,
     PlantillaSchema,
     ConfigDJSchema,
+    ConfigFiltrosSchema,
 )
 from app.services import session_store
 from app.services import db_config
-from app.services.db_config import ConfigDJData
+from app.services.db_config import ConfigDJData, ConfigFiltrosData
 
 router = APIRouter(tags=["session"])
 
@@ -55,6 +55,27 @@ def patch_minuta_enviado(
     return MinutaSchema(**updated.__dict__)
 
 
+@router.post("/session/minutas/{minuta_id}/agregar", response_model=MinutaSchema)
+def post_agregar_filtrada(
+    minuta_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    updated = session_store.agregar_filtrada_a_borrador(str(current_user.id), minuta_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Minuta filtrada no encontrada")
+    return MinutaSchema(**updated.__dict__)
+
+
+@router.post("/session/minutas-filtradas/agregar-todas")
+def post_agregar_todas_filtradas(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    count = session_store.agregar_todas_filtradas_a_borrador(str(current_user.id))
+    return {"agregadas": count}
+
+
 @router.get("/plantilla", response_model=PlantillaSchema)
 def get_plantilla(
     db: Session = Depends(get_db),
@@ -85,6 +106,7 @@ def get_config_dj(
         texto_alerta=cfg.texto_alerta,
         reglas=cfg.reglas,
         logica=cfg.logica,
+        activar_si_requiere_conformidad=cfg.activar_si_requiere_conformidad,
     )
 
 
@@ -98,6 +120,29 @@ def patch_config_dj(
         activa=body.activa,
         incluir_texto_en_minuta=body.incluir_texto_en_minuta,
         texto_alerta=body.texto_alerta,
+        reglas=[r.model_dump() for r in body.reglas],
+        logica=body.logica,
+        activar_si_requiere_conformidad=body.activar_si_requiere_conformidad,
+    ))
+    return body
+
+
+@router.get("/config/filtros-minutas", response_model=ConfigFiltrosSchema)
+def get_config_filtros(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cfg = db_config.load_config_filtros(db)
+    return ConfigFiltrosSchema(reglas=cfg.reglas, logica=cfg.logica)
+
+
+@router.patch("/config/filtros-minutas", response_model=ConfigFiltrosSchema)
+def patch_config_filtros(
+    body: ConfigFiltrosSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_config.save_config_filtros(db, ConfigFiltrosData(
         reglas=[r.model_dump() for r in body.reglas],
         logica=body.logica,
     ))
