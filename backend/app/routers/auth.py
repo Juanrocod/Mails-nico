@@ -3,14 +3,13 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from jose import JWTError
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.limiter import limiter
 from app.core.security import (
     create_access_token,
     create_pending_2fa_token,
@@ -43,8 +42,6 @@ from app.services import session_store
 from app.services.auth import authenticate_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/login", response_model=PendingTokenResponse)
