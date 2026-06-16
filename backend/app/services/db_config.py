@@ -29,6 +29,13 @@ class ConfigDJData:
     texto_alerta: str = ""
     reglas: list = field(default_factory=list)
     logica: str = "OR"
+    activar_si_requiere_conformidad: bool = True
+
+
+@dataclass
+class ConfigFiltrosData:
+    reglas: list = field(default_factory=list)
+    logica: str = "OR"
 
 
 def load_plantilla(db: Session) -> str:

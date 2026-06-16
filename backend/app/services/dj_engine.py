@@ -1,8 +1,8 @@
 from typing import Optional
 from app.services.db_config import ConfigDJData
 
-_CAMPOS_NUMERICOS = {"cantidad", "precio"}
-_CAMPOS_TEXTO = {"moneda", "liquidacion", "tipo", "instrumento"}
+_CAMPOS_NUMERICOS = {"cantidad", "precio", "monto", "cantidad_operada", "precio_operado", "requiere_conformidad"}
+_CAMPOS_TEXTO = {"operacion", "operador", "origen", "estado", "moneda", "instrumento"}
 _CAMPOS_PERMITIDOS = _CAMPOS_NUMERICOS | _CAMPOS_TEXTO
 _OPERADORES = {">", "<", "=", "!=", ">=", "<="}
 
@@ -13,7 +13,14 @@ class _SafeDict(dict):
 
 
 def evaluar_reglas(config: ConfigDJData, datos: dict) -> bool:
-    if not config.activa or not config.reglas:
+    if not config.activa:
+        return False
+
+    # Auto-trigger por RequiereConformidad de la plataforma
+    if config.activar_si_requiere_conformidad and datos.get("requiere_conformidad") == 1:
+        return True
+
+    if not config.reglas:
         return False
 
     resultados = []
