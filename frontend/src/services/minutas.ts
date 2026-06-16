@@ -18,3 +18,13 @@ export async function marcarEnviado(minutaId: string): Promise<Minuta> {
   const res = await api.patch<Minuta>(`/session/minutas/${minutaId}/enviado`)
   return res.data
 }
+
+export async function agregarFiltrada(minutaId: string): Promise<Minuta> {
+  const res = await api.post<Minuta>(`/session/minutas/${minutaId}/agregar`)
+  return res.data
+}
+
+export async function agregarTodasFiltradas(): Promise<{ agregadas: number }> {
+  const res = await api.post<{ agregadas: number }>('/session/minutas-filtradas/agregar-todas')
+  return res.data
+}
