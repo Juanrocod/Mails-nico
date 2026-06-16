@@ -151,7 +151,8 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
 
 
 @router.post("/register/confirm", status_code=204)
-def confirm_register(body: ConfirmRegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def confirm_register(request: Request, body: ConfirmRegisterRequest, db: Session = Depends(get_db)):
     try:
         payload = decode_token(body.setup_token)
         if payload.get("type") != "totp_setup":
