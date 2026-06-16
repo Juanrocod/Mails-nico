@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useLocation } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../hooks/useAuth'
@@ -11,6 +12,8 @@ interface FormValues {
 
 export default function LoginPage() {
   const { handleLogin } = useAuth()
+  const location = useLocation()
+  const passwordReset = (location.state as any)?.passwordReset === true
   const [error, setError] = useState<string | null>(null)
   const {
     register,
@@ -70,6 +73,12 @@ export default function LoginPage() {
             )}
           </div>
 
+          {passwordReset && (
+            <p className="text-sm text-green-700 bg-green-50 rounded px-3 py-2">
+              Contraseña actualizada. Ingresá con tu nueva contraseña.
+            </p>
+          )}
+
           {error && (
             <p role="alert" className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
               {error}
@@ -79,6 +88,10 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? 'Ingresando...' : 'Ingresar'}
           </Button>
+
+          <p className="text-center text-xs text-slate-400">
+            ¿Olvidaste tu contraseña? Pedile al administrador que genere un link de reset.
+          </p>
         </form>
       </div>
     </div>
