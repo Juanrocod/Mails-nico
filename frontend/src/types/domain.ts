@@ -31,11 +31,16 @@ export interface Minuta {
   creado_en: string; // ISO datetime string
 }
 
+export interface RowError {
+  fila: number;
+  mensaje: string;
+}
+
 export interface UploadMVPResponse {
   ordenes_validas: number;
   ordenes_con_error: number;
   ordenes_filtradas: number;
-  errors: string[];
+  errors: RowError[];
   minutas: Minuta[];
 }
 

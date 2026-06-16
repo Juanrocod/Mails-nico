@@ -34,13 +34,19 @@ const DJ_VARIABLES = [
   '{cliente_nombre}',
   '{cuenta_comitente}',
   '{cuenta_cotapartista}',
+  '{operacion}',
   '{instrumento}',
-  '{tipo}',
   '{cantidad}',
   '{precio}',
+  '{monto}',
   '{moneda}',
-  '{liquidacion}',
   '{fecha_operacion}',
+  '{fecha_liquidacion}',
+  '{estado}',
+  '{asesor}',
+  '{operador}',
+  '{origen}',
+  '{id_orden}',
 ]
 
 const REGLA_VACIA: { campo: CampoRegla; operador: OperadorRegla; valor: string } = { campo: 'cantidad', operador: '>=', valor: '' }
