@@ -40,6 +40,7 @@ def _make_minuta(**overrides) -> MinutaSession:
         dj_aplicada=False,
         dj_texto=None,
         estado="BORRADOR",
+        filtro_motivo=None,
         texto_minuta="Texto de prueba",
         texto_editado=False,
         creado_en=datetime.now(timezone.utc),

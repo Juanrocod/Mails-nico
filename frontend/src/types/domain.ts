@@ -26,6 +26,7 @@ export interface Minuta {
   dj_aplicada: boolean;
   dj_texto: string | null;
   estado: EstadoMinuta;
+  filtro_motivo: string | null;
   texto_minuta: string;
   texto_editado: boolean;
   creado_en: string; // ISO datetime string

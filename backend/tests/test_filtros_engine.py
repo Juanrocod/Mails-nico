@@ -26,22 +26,22 @@ DATOS = {
 
 def test_sin_reglas_no_filtra():
     """Sin reglas configuradas, ninguna fila se excluye."""
-    assert evaluar_filtros(cfg(), DATOS) is False
+    assert evaluar_filtros(cfg(), DATOS) is None
 
 
 def test_regla_texto_excluye_match():
     config = cfg(reglas=[{"campo": "operacion", "operador": "=", "valor": "Transferencia"}])
-    assert evaluar_filtros(config, DATOS) is True
+    assert evaluar_filtros(config, DATOS) == "operacion"
 
 
 def test_regla_texto_no_excluye_sin_match():
     config = cfg(reglas=[{"campo": "operacion", "operador": "=", "valor": "Compra CI"}])
-    assert evaluar_filtros(config, DATOS) is False
+    assert evaluar_filtros(config, DATOS) is None
 
 
 def test_regla_numerico_excluye():
     config = cfg(reglas=[{"campo": "cantidad", "operador": "=", "valor": "-1"}])
-    assert evaluar_filtros(config, DATOS) is True
+    assert evaluar_filtros(config, DATOS) == "cantidad"
 
 
 def test_logica_and_todas_deben_cumplirse():
@@ -53,7 +53,7 @@ def test_logica_and_todas_deben_cumplirse():
         ],
     )
     # origen es "Cliente", no "User" → AND falla → no filtra
-    assert evaluar_filtros(config, DATOS) is False
+    assert evaluar_filtros(config, DATOS) is None
 
 
 def test_logica_or_basta_una():
@@ -64,9 +64,21 @@ def test_logica_or_basta_una():
             {"campo": "origen", "operador": "=", "valor": "Cliente"},
         ],
     )
-    assert evaluar_filtros(config, DATOS) is True
+    # "origen" matchea primero en la lista
+    assert evaluar_filtros(config, DATOS) == "origen"
 
 
 def test_campo_invalido_ignorado():
     config = cfg(reglas=[{"campo": "campo_raro", "operador": "=", "valor": "x"}])
-    assert evaluar_filtros(config, DATOS) is False
+    assert evaluar_filtros(config, DATOS) is None
+
+
+def test_logica_and_retorna_campos_unidos():
+    config = cfg(
+        logica="AND",
+        reglas=[
+            {"campo": "operacion", "operador": "=", "valor": "Transferencia"},
+            {"campo": "origen", "operador": "=", "valor": "Cliente"},
+        ],
+    )
+    assert evaluar_filtros(config, DATOS) == "operacion + origen"

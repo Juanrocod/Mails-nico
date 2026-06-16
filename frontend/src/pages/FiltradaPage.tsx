@@ -62,11 +62,19 @@ export default function FiltradaPage() {
         <div className="space-y-3">
           {minutas.map((minuta) => (
             <div key={minuta.id} className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 space-y-1">
                 <MinutaCard
                   minuta={minuta}
                   onClick={() => setSelectedId(minuta.id)}
                 />
+                {minuta.filtro_motivo && (
+                  <div className="flex items-center gap-1.5 px-1">
+                    <span className="text-xs text-slate-400">Filtrada por:</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      {minuta.filtro_motivo}
+                    </span>
+                  </div>
+                )}
               </div>
               <Button
                 variant="outline"

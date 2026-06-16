@@ -34,6 +34,7 @@ class MinutaSession:
     dj_aplicada: bool
     dj_texto: Optional[str]
     estado: Literal["BORRADOR", "ENVIADO", "FILTRADA"]
+    filtro_motivo: Optional[str]
     texto_minuta: str
     texto_editado: bool
     creado_en: datetime

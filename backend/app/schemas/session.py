@@ -36,6 +36,7 @@ class MinutaSchema(BaseModel):
     dj_aplicada: bool
     dj_texto: Optional[str]
     estado: str
+    filtro_motivo: Optional[str]
     texto_minuta: str
     texto_editado: bool
     creado_en: datetime

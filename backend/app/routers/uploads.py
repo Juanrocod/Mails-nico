@@ -72,9 +72,9 @@ def upload_excel(
             "requiere_conformidad": parsed.requiere_conformidad,
         }
 
-        excluida = evaluar_filtros(config_filtros, datos)
-        estado_minuta = "FILTRADA" if excluida else "BORRADOR"
-        if excluida:
+        filtro_motivo = evaluar_filtros(config_filtros, datos)
+        estado_minuta = "FILTRADA" if filtro_motivo else "BORRADOR"
+        if filtro_motivo:
             filtradas_count += 1
 
         dj_aplica = evaluar_reglas(config_dj, datos)
@@ -105,6 +105,7 @@ def upload_excel(
             dj_aplicada=dj_aplica,
             dj_texto=dj_texto,
             estado=estado_minuta,
+            filtro_motivo=filtro_motivo,
             texto_minuta=texto,
             texto_editado=False,
             creado_en=now,
