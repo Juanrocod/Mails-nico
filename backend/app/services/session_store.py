@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 
 SESSION_TTL = timedelta(hours=12)
@@ -33,7 +33,7 @@ class MinutaSession:
     # Campos de sesión
     dj_aplicada: bool
     dj_texto: Optional[str]
-    estado: str                # "BORRADOR" | "ENVIADO" | "FILTRADA"
+    estado: Literal["BORRADOR", "ENVIADO", "FILTRADA"]
     texto_minuta: str
     texto_editado: bool
     creado_en: datetime
@@ -96,7 +96,7 @@ def update_minuta_texto(user_id: str, minuta_id: str, texto: str) -> Optional[Mi
 
 def marcar_enviada(user_id: str, minuta_id: str) -> Optional[MinutaSession]:
     m = get_minuta(user_id, minuta_id)
-    if m is None:
+    if m is None or m.estado != "BORRADOR":
         return None
     m.estado = "ENVIADO"
     return m
