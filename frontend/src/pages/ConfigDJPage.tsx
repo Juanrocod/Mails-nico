@@ -80,6 +80,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
   const [incluirTexto, setIncluirTexto] = useState(dj.incluir_texto_en_minuta)
   const [textoAlerta, setTextoAlerta] = useState(dj.texto_alerta)
   const [saved, setSaved] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
 
   useEffect(() => {
     setNombre(dj.nombre)
@@ -122,7 +123,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
         },
       })
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      setTimeout(() => { setSaved(false); setOpen(false) }, 1200)
     } catch { /* handled by TanStack Query */ }
   }
 
@@ -136,7 +137,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
   const disabled = !activa
 
   return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-slate-200 rounded-lg overflow-hidden">
+    <Collapsible open={open} onOpenChange={setOpen} className="border border-slate-200 rounded-lg overflow-hidden">
       <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 bg-white hover:bg-slate-50 transition-colors group">
         <div className="flex items-center gap-3">
           <div className={`h-2 w-2 rounded-full shrink-0 ${activa ? 'bg-green-500' : 'bg-slate-300'}`} />
