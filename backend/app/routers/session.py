@@ -94,29 +94,35 @@ def patch_plantilla(
     return body
 
 
-@router.get("/config/dj", response_model=ConfigDJSchema)
-def get_config_dj(
+@router.get("/config/dj", response_model=list[ConfigDJSchema])
+def get_config_dj_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cfg = db_config.load_config_dj(db)
-    return ConfigDJSchema(
-        activa=cfg.activa,
-        incluir_texto_en_minuta=cfg.incluir_texto_en_minuta,
-        texto_alerta=cfg.texto_alerta,
-        reglas=cfg.reglas,
-        logica=cfg.logica,
-        activar_si_requiere_conformidad=cfg.activar_si_requiere_conformidad,
-    )
+    all_djs = db_config.load_all_config_dj(db)
+    return [
+        ConfigDJSchema(
+            id=dj.id,
+            nombre=dj.nombre,
+            activa=dj.activa,
+            incluir_texto_en_minuta=dj.incluir_texto_en_minuta,
+            texto_alerta=dj.texto_alerta,
+            reglas=dj.reglas,
+            logica=dj.logica,
+            activar_si_requiere_conformidad=dj.activar_si_requiere_conformidad,
+        )
+        for dj in all_djs
+    ]
 
 
-@router.patch("/config/dj", response_model=ConfigDJSchema)
-def patch_config_dj(
+@router.post("/config/dj", response_model=ConfigDJSchema, status_code=201)
+def create_config_dj(
     body: ConfigDJSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    db_config.save_config_dj(db, ConfigDJData(
+    created = db_config.create_config_dj(db, ConfigDJData(
+        nombre=body.nombre,
         activa=body.activa,
         incluir_texto_en_minuta=body.incluir_texto_en_minuta,
         texto_alerta=body.texto_alerta,
@@ -124,7 +130,40 @@ def patch_config_dj(
         logica=body.logica,
         activar_si_requiere_conformidad=body.activar_si_requiere_conformidad,
     ))
+    body.id = created.id
     return body
+
+
+@router.patch("/config/dj/{dj_id}", response_model=ConfigDJSchema)
+def patch_config_dj(
+    dj_id: int,
+    body: ConfigDJSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    updated = db_config.update_config_dj(db, dj_id, ConfigDJData(
+        nombre=body.nombre,
+        activa=body.activa,
+        incluir_texto_en_minuta=body.incluir_texto_en_minuta,
+        texto_alerta=body.texto_alerta,
+        reglas=[r.model_dump() for r in body.reglas],
+        logica=body.logica,
+        activar_si_requiere_conformidad=body.activar_si_requiere_conformidad,
+    ))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Configuración DJ no encontrada")
+    body.id = dj_id
+    return body
+
+
+@router.delete("/config/dj/{dj_id}", status_code=204)
+def delete_config_dj(
+    dj_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not db_config.delete_config_dj(db, dj_id):
+        raise HTTPException(status_code=404, detail="Configuración DJ no encontrada")
 
 
 @router.get("/config/filtros-minutas", response_model=ConfigFiltrosSchema)

@@ -91,6 +91,8 @@ class ReglaSchema(BaseModel):
 
 
 class ConfigDJSchema(BaseModel):
+    id: Optional[int] = None
+    nombre: str = "DJ General"
     activa: bool
     incluir_texto_en_minuta: bool = False
     texto_alerta: str

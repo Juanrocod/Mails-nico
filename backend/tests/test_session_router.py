@@ -1,5 +1,14 @@
 # backend/tests/test_session_router.py
+import pytest
 import app.services.session_store as store
+from app.models.config_dj import ConfigDJ
+
+
+@pytest.fixture(autouse=True)
+def _clean_config_dj(db):
+    """Ensure config_dj table is empty before each test for isolation."""
+    db.query(ConfigDJ).delete()
+    db.commit()
 
 
 def _upload_excel(client, auth_headers, make_valid_excel):
@@ -207,53 +216,80 @@ def test_patch_plantilla(client, auth_headers):
 
 
 # ---------------------------------------------------------------------------
-# GET/PATCH /config/dj
+# CRUD /config/dj  (multi-DJ)
 # ---------------------------------------------------------------------------
 
-def test_get_config_dj_default(client, auth_headers):
+def test_get_config_dj_list_empty(client, auth_headers):
     r = client.get("/config/dj", headers=auth_headers)
     assert r.status_code == 200
-    assert r.json()["activa"] is False
-    assert r.json()["texto_alerta"] == ""
+    assert r.json() == []
 
 
-def test_patch_config_dj(client, auth_headers):
-    r = client.patch(
-        "/config/dj",
+def test_create_config_dj(client, auth_headers):
+    body = {
+        "nombre": "DJ por monto alto",
+        "activa": True,
+        "texto_alerta": "Adjuntar formulario DJ-1",
+        "incluir_texto_en_minuta": False,
+        "reglas": [],
+        "logica": "OR",
+        "activar_si_requiere_conformidad": True,
+    }
+    r = client.post("/config/dj", json=body, headers=auth_headers)
+    assert r.status_code == 201
+    data = r.json()
+    assert data["nombre"] == "DJ por monto alto"
+    assert data["activa"] is True
+    assert "id" in data
+
+
+def test_create_and_list_multiple_djs(client, auth_headers):
+    client.post("/config/dj", json={"nombre": "DJ 1", "activa": True, "texto_alerta": "", "reglas": [], "logica": "OR"}, headers=auth_headers)
+    client.post("/config/dj", json={"nombre": "DJ 2", "activa": False, "texto_alerta": "", "reglas": [], "logica": "OR"}, headers=auth_headers)
+    r = client.get("/config/dj", headers=auth_headers)
+    assert r.status_code == 200
+    assert len(r.json()) == 2
+
+
+def test_patch_config_dj_by_id(client, auth_headers):
+    r = client.post("/config/dj", json={"nombre": "Original", "activa": False, "texto_alerta": "", "reglas": [], "logica": "OR"}, headers=auth_headers)
+    dj_id = r.json()["id"]
+    r2 = client.patch(
+        f"/config/dj/{dj_id}",
         json={
+            "nombre": "Editada",
             "activa": True,
-            "texto_alerta": "Adjuntar formulario DJ-1",
-            "incluir_texto_en_minuta": False,
-            "reglas": [],
-            "logica": "OR",
-            "activar_si_requiere_conformidad": True,
+            "texto_alerta": "Nuevo texto",
+            "incluir_texto_en_minuta": True,
+            "reglas": [{"campo": "monto", "operador": ">=", "valor": "500000"}],
+            "logica": "AND",
+            "activar_si_requiere_conformidad": False,
         },
         headers=auth_headers,
     )
-    assert r.status_code == 200
-    assert r.json()["activa"] is True
-    r2 = client.get("/config/dj", headers=auth_headers)
+    assert r2.status_code == 200
+    assert r2.json()["nombre"] == "Editada"
     assert r2.json()["activa"] is True
-    assert r2.json()["texto_alerta"] == "Adjuntar formulario DJ-1"
+    assert len(r2.json()["reglas"]) == 1
 
 
-def test_patch_config_dj_with_reglas(client, auth_headers):
-    """PATCH /config/dj with valid reglas and logica AND."""
-    body = {
-        "activa": True,
-        "texto_alerta": "Declaración requerida",
-        "incluir_texto_en_minuta": True,
-        "reglas": [{"campo": "operacion", "operador": "=", "valor": "Compra CI"}],
-        "logica": "AND",
-        "activar_si_requiere_conformidad": False,
-    }
-    r = client.patch("/config/dj", json=body, headers=auth_headers)
-    assert r.status_code == 200
-    data = r.json()
-    assert data["logica"] == "AND"
-    assert data["activar_si_requiere_conformidad"] is False
-    assert len(data["reglas"]) == 1
-    assert data["reglas"][0]["campo"] == "operacion"
+def test_patch_config_dj_nonexistent_returns_404(client, auth_headers):
+    r = client.patch("/config/dj/9999", json={"nombre": "x", "activa": False, "texto_alerta": "", "reglas": [], "logica": "OR"}, headers=auth_headers)
+    assert r.status_code == 404
+
+
+def test_delete_config_dj(client, auth_headers):
+    r = client.post("/config/dj", json={"nombre": "Para borrar", "activa": False, "texto_alerta": "", "reglas": [], "logica": "OR"}, headers=auth_headers)
+    dj_id = r.json()["id"]
+    r2 = client.delete(f"/config/dj/{dj_id}", headers=auth_headers)
+    assert r2.status_code == 204
+    r3 = client.get("/config/dj", headers=auth_headers)
+    assert len(r3.json()) == 0
+
+
+def test_delete_config_dj_nonexistent_returns_404(client, auth_headers):
+    r = client.delete("/config/dj/9999", headers=auth_headers)
+    assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------
