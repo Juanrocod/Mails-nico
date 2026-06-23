@@ -309,7 +309,8 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
 }
 
 export default function ConfigDJPage() {
-  const { data: djList, isLoading } = useConfigDJList()
+  const { data: rawData, isLoading } = useConfigDJList()
+  const djList = Array.isArray(rawData) ? rawData : undefined
   const crear = useCrearConfigDJ()
   const [newlyCreatedId, setNewlyCreatedId] = useState<number | null>(null)
 
