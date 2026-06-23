@@ -8,7 +8,7 @@ import { useConfigDJList, useCrearConfigDJ, useActualizarConfigDJ, useEliminarCo
 import type { ConfigDJ, CampoRegla, OperadorRegla } from '../types/domain'
 
 const CAMPOS: { value: CampoRegla; label: string }[] = [
-  { value: 'operacion',            label: 'Operacion' },
+  { value: 'operacion',            label: 'Operación' },
   { value: 'operador',             label: 'Operador' },
   { value: 'origen',               label: 'Origen' },
   { value: 'estado',               label: 'Estado' },
@@ -166,7 +166,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
             <div>
               <p className="text-sm font-medium text-slate-800">{activa ? 'Activa' : 'Desactivada'}</p>
               <p className="text-xs text-slate-500">
-                {activa ? 'Se evalua en cada upload' : 'No se evalua'}
+                {activa ? 'Se evalúa en cada upload' : 'No se evalúa'}
               </p>
             </div>
           </div>
@@ -193,7 +193,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
             </div>
             {reglas.length === 0 && (
               <p className="text-sm text-slate-400 italic text-center py-2">
-                Sin reglas -- solo activacion automatica.
+                Sin reglas — solo activación automática.
               </p>
             )}
             {reglas.map((regla, idx) => (
@@ -230,7 +230,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
             ))}
             {reglas.length > 1 && (
               <div className="flex items-center gap-3 pt-1">
-                <span className="text-xs text-slate-500">Logica:</span>
+                <span className="text-xs text-slate-500">Lógica:</span>
                 <div className="flex gap-2">
                   {(['OR', 'AND'] as const).map(l => (
                     <button
@@ -289,7 +289,7 @@ function DJConfigPanel({ dj, defaultOpen = false }: DJPanelProps) {
             <Button size="sm" onClick={handleGuardar} disabled={actualizar.isPending}>
               {actualizar.isPending ? 'Guardando...' : 'Guardar'}
             </Button>
-            {saved && <span className="text-sm text-green-600">Guardado</span>}
+            {saved && <span className="text-sm text-green-600">Guardado ✓</span>}
             <div className="flex-1" />
             <Button
               variant="ghost"
@@ -334,7 +334,7 @@ export default function ConfigDJPage() {
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Declaraciones Juradas</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Configura las condiciones bajo las cuales una operacion requiere DJ.
+            Configurá las condiciones bajo las cuales una operación requiere DJ.
           </p>
         </div>
         <Button onClick={handleNuevaDJ} disabled={crear.isPending}>
