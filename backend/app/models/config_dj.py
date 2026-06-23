@@ -5,7 +5,8 @@ from app.core.database import Base
 
 class ConfigDJ(Base):
     __tablename__ = "config_dj"
-    id = Column(Integer, primary_key=True, default=1)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nombre = Column(String(200), nullable=False, default="DJ General")
     activa = Column(Boolean, nullable=False, default=False)
     incluir_texto_en_minuta = Column(Boolean, nullable=False, default=False)
     texto_alerta = Column(Text, nullable=False, default="")

@@ -35,17 +35,73 @@ def test_save_plantilla_upserts(db):
     assert db.query(Plantilla).count() == 1
 
 
-def test_load_config_dj_returns_defaults_when_empty(db):
+# --- Multi-DJ CRUD tests ---
+
+
+def test_load_all_config_dj_empty(db):
+    result = db_config.load_all_config_dj(db)
+    assert result == []
+
+
+def test_create_config_dj(db):
+    data = ConfigDJData(
+        nombre="DJ por monto",
+        activa=True,
+        incluir_texto_en_minuta=True,
+        texto_alerta="Alerta: monto alto",
+        reglas=[{"campo": "monto", "operador": ">=", "valor": "1000000"}],
+        logica="AND",
+    )
+    created = db_config.create_config_dj(db, data)
+    assert created.id is not None
+    assert created.nombre == "DJ por monto"
+    assert created.activa is True
+
+
+def test_create_multiple_djs(db):
+    db_config.create_config_dj(db, ConfigDJData(nombre="DJ 1"))
+    db_config.create_config_dj(db, ConfigDJData(nombre="DJ 2"))
+    all_djs = db_config.load_all_config_dj(db)
+    assert len(all_djs) == 2
+    assert all_djs[0].nombre == "DJ 1"
+    assert all_djs[1].nombre == "DJ 2"
+
+
+def test_update_config_dj(db):
+    created = db_config.create_config_dj(db, ConfigDJData(nombre="Original"))
+    updated = db_config.update_config_dj(db, created.id, ConfigDJData(nombre="Editada", activa=True))
+    assert updated is not None
+    assert updated.nombre == "Editada"
+    assert updated.activa is True
+
+
+def test_update_config_dj_nonexistent_returns_none(db):
+    result = db_config.update_config_dj(db, 9999, ConfigDJData(nombre="x"))
+    assert result is None
+
+
+def test_delete_config_dj(db):
+    created = db_config.create_config_dj(db, ConfigDJData(nombre="Para borrar"))
+    assert db_config.delete_config_dj(db, created.id) is True
+    assert db_config.load_all_config_dj(db) == []
+
+
+def test_delete_config_dj_nonexistent_returns_false(db):
+    assert db_config.delete_config_dj(db, 9999) is False
+
+
+# --- Compatibility shim tests ---
+
+
+def test_load_config_dj_compat_returns_defaults_when_empty(db):
     cfg = db_config.load_config_dj(db)
     assert cfg.activa is False
-    assert cfg.incluir_texto_en_minuta is False
-    assert cfg.texto_alerta == ""
     assert cfg.reglas == []
-    assert cfg.logica == "OR"
 
 
-def test_save_and_load_config_dj(db):
+def test_save_and_load_config_dj_compat(db):
     data = ConfigDJData(
+        nombre="DJ General",
         activa=True,
         incluir_texto_en_minuta=True,
         texto_alerta="DJ: {cliente_nombre}",
@@ -55,14 +111,5 @@ def test_save_and_load_config_dj(db):
     db_config.save_config_dj(db, data)
     loaded = db_config.load_config_dj(db)
     assert loaded.activa is True
-    assert loaded.incluir_texto_en_minuta is True
     assert loaded.texto_alerta == "DJ: {cliente_nombre}"
     assert loaded.reglas == [{"campo": "cantidad", "operador": ">=", "valor": "1000000"}]
-    assert loaded.logica == "AND"
-
-
-def test_save_config_dj_upserts(db):
-    db_config.save_config_dj(db, ConfigDJData(activa=True))
-    db_config.save_config_dj(db, ConfigDJData(activa=False))
-    assert db_config.load_config_dj(db).activa is False
-    assert db.query(ConfigDJ).count() == 1

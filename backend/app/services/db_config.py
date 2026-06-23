@@ -36,6 +36,8 @@ DEFAULT_PLANTILLA = (
 
 @dataclass
 class ConfigDJData:
+    id: int | None = None
+    nombre: str = "DJ General"
     activa: bool = False
     incluir_texto_en_minuta: bool = False
     texto_alerta: str = ""
@@ -66,11 +68,10 @@ def save_plantilla(db: Session, texto: str) -> None:
     db.commit()
 
 
-def load_config_dj(db: Session) -> ConfigDJData:
-    row = db.get(ConfigDJ, 1)
-    if not row:
-        return ConfigDJData()
+def _row_to_data(row: ConfigDJ) -> ConfigDJData:
     return ConfigDJData(
+        id=row.id,
+        nombre=row.nombre,
         activa=row.activa,
         incluir_texto_en_minuta=row.incluir_texto_en_minuta,
         texto_alerta=row.texto_alerta,
@@ -80,29 +81,75 @@ def load_config_dj(db: Session) -> ConfigDJData:
     )
 
 
-def save_config_dj(db: Session, data: ConfigDJData) -> None:
+def load_all_config_dj(db: Session) -> list[ConfigDJData]:
+    rows = db.query(ConfigDJ).order_by(ConfigDJ.id).all()
+    return [_row_to_data(row) for row in rows]
+
+
+def create_config_dj(db: Session, data: ConfigDJData) -> ConfigDJData:
     now = datetime.now(timezone.utc)
-    row = db.get(ConfigDJ, 1)
-    if row:
-        row.activa = data.activa
-        row.incluir_texto_en_minuta = data.incluir_texto_en_minuta
-        row.texto_alerta = data.texto_alerta
-        row.reglas = json.dumps(data.reglas)
-        row.logica = data.logica
-        row.activar_si_requiere_conformidad = data.activar_si_requiere_conformidad
-        row.actualizado_en = now
-    else:
-        db.add(ConfigDJ(
-            id=1,
-            activa=data.activa,
-            incluir_texto_en_minuta=data.incluir_texto_en_minuta,
-            texto_alerta=data.texto_alerta,
-            reglas=json.dumps(data.reglas),
-            logica=data.logica,
-            activar_si_requiere_conformidad=data.activar_si_requiere_conformidad,
-            actualizado_en=now,
-        ))
+    row = ConfigDJ(
+        nombre=data.nombre,
+        activa=data.activa,
+        incluir_texto_en_minuta=data.incluir_texto_en_minuta,
+        texto_alerta=data.texto_alerta,
+        reglas=json.dumps(data.reglas),
+        logica=data.logica,
+        activar_si_requiere_conformidad=data.activar_si_requiere_conformidad,
+        actualizado_en=now,
+    )
+    db.add(row)
     db.commit()
+    db.refresh(row)
+    data.id = row.id
+    return data
+
+
+def update_config_dj(db: Session, dj_id: int, data: ConfigDJData) -> ConfigDJData | None:
+    row = db.get(ConfigDJ, dj_id)
+    if not row:
+        return None
+    now = datetime.now(timezone.utc)
+    row.nombre = data.nombre
+    row.activa = data.activa
+    row.incluir_texto_en_minuta = data.incluir_texto_en_minuta
+    row.texto_alerta = data.texto_alerta
+    row.reglas = json.dumps(data.reglas)
+    row.logica = data.logica
+    row.activar_si_requiere_conformidad = data.activar_si_requiere_conformidad
+    row.actualizado_en = now
+    db.commit()
+    data.id = dj_id
+    return data
+
+
+def delete_config_dj(db: Session, dj_id: int) -> bool:
+    row = db.get(ConfigDJ, dj_id)
+    if not row:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+# --- Compatibility shims (used by routers/session.py and routers/uploads.py) ---
+# These will be removed in Tasks 2-3 when callers migrate to multi-DJ API.
+
+def load_config_dj(db: Session) -> ConfigDJData:
+    """Load the first DJ config, or return defaults if none exist."""
+    all_djs = load_all_config_dj(db)
+    if not all_djs:
+        return ConfigDJData()
+    return all_djs[0]
+
+
+def save_config_dj(db: Session, data: ConfigDJData) -> None:
+    """Upsert the first DJ config (singleton compat)."""
+    all_djs = load_all_config_dj(db)
+    if all_djs:
+        update_config_dj(db, all_djs[0].id, data)
+    else:
+        create_config_dj(db, data)
 
 
 def load_config_filtros(db: Session) -> ConfigFiltrosData:
