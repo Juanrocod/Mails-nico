@@ -74,3 +74,23 @@ def health():
         return {"status": "ok", "database": "ok"}
     except Exception:
         return {"status": "degraded", "database": "error"}
+
+
+@app.post("/admin/create-invite")
+def create_invite(admin_key: str, frontend_url: str = "http://localhost:5173"):
+    if admin_key != settings.SECRET_KEY:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from app.models.invite_token import InviteToken
+    db = SessionLocal()
+    token_value = secrets.token_urlsafe(32)
+    db.add(InviteToken(
+        token=token_value,
+        tipo="invite",
+        expira_en=datetime.now(timezone.utc) + timedelta(hours=48),
+    ))
+    db.commit()
+    db.close()
+    return {"register_url": f"{frontend_url}/register?token={token_value}"}
