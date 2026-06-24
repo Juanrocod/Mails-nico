@@ -91,3 +91,18 @@ export interface SessionMinutasResponse {
 export interface PlantillaResponse {
   texto: string;
 }
+
+export interface Plantilla {
+  texto: string;
+}
+
+export interface LoginResponse {
+  pending_token: string;
+  message: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}

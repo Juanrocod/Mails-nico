@@ -9,6 +9,7 @@ import type { EstadoMinuta, Minuta } from '../types/domain'
 const ESTADO_TITULO: Record<EstadoMinuta, string> = {
   BORRADOR: 'Borradores',
   ENVIADO: 'Enviados',
+  FILTRADA: 'Filtradas',
 }
 
 interface Props {
