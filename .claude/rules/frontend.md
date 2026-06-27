@@ -2,225 +2,174 @@
 paths:
   - "frontend/**/*.tsx"
   - "frontend/**/*.ts"
-  - "frontend/components/**"
 ---
 
 ## Stack
 
 - React 18 + TypeScript + Vite
-- shadcn/ui (componentes en `src/components/ui/`) + Tailwind CSS v3
-- TanStack Query v5 para estado del servidor
+- shadcn/ui + Tailwind CSS v3
+- TanStack Query v5
 - React Router v6
 - React Hook Form v7
-- Axios v1 con interceptores en `src/services/api.ts`
-- date-fns v3 para formateo de fechas (locale `es`)
-- lucide-react para iconos
+- Axios v1 — instancia única en `src/services/api.ts`
+- date-fns v3 (locale `es`)
+- lucide-react
 
 ## Estructura de carpetas
 
 ```
 src/
-├── pages/          ← LoginPage, TwoFactorPage, DashboardPage, PlantillaPage, ConfigDJPage
+├── pages/          ← LoginPage, TwoFactorPage, RegisterPage, ResetPasswordPage,
+│                     DashboardPage, FiltradaPage, PlantillaPage, ConfigDJPage, FiltrosMinutasPage
 ├── components/
-│   ├── layout/     ← AppLayout.tsx, Sidebar.tsx
+│   ├── layout/     ← AppLayout.tsx, Sidebar.tsx, AuthGuard.tsx, ErrorBoundary.tsx
 │   ├── minutas/    ← MinutaCard.tsx, MinutaDrawer.tsx
 │   ├── upload/     ← ExcelUploadModal.tsx
+│   ├── profile/    ← ChangePasswordModal.tsx, RegenerateTOTPModal.tsx
 │   └── ui/         ← shadcn/ui (auto-generados, no editar a mano)
-├── services/       ← api.ts, auth.ts, minutas.ts, upload.ts, plantilla.ts, configDJ.ts
-├── hooks/          ← useAuth.ts, useMinutas.ts, useSession.ts
-└── types/          ← domain.ts (todos los tipos del dominio)
+├── services/       ← api.ts, auth.ts, minutas.ts, upload.ts, plantilla.ts, configDJ.ts, configFiltros.ts
+├── hooks/          ← useAuth.ts, useSession.ts
+└── types/          ← domain.ts (única fuente de verdad de tipos)
 ```
 
-## Naming
-
-- Componentes: PascalCase (`MinutaCard`, `ExcelUploadModal`)
-- Hooks: camelCase con prefijo `use` (`useMinutas`, `useAuth`)
-- Servicios: camelCase (`fetchMinutas`, `aprobarMinuta`)
-- Query keys: arrays `['minutas', estado]` donde `estado` es el enum de estado
-- Archivos: nombre igual al export default (`MinutaCard.tsx` exporta `MinutaCard`)
-
-## Rutas (MVP)
+## Rutas (App.tsx)
 
 ```
-/login                    → LoginPage
-/login/2fa                → TwoFactorPage
-/dashboard/borradores     → DashboardPage (estado=BORRADOR)
-/dashboard/enviados       → DashboardPage (estado=ENVIADO)
-/dashboard/plantilla      → PlantillaPage
-/dashboard/config-dj      → ConfigDJPage
-/                         → redirect a /dashboard/borradores si auth, sino /login
+/login                     → LoginPage
+/login/2fa                 → TwoFactorPage
+/register                  → RegisterPage
+/reset-password            → ResetPasswordPage
+/dashboard/borradores      → DashboardPage (estado="BORRADOR")
+/dashboard/enviados        → DashboardPage (estado="ENVIADO")
+/dashboard/filtradas       → FiltradaPage
+/dashboard/plantilla       → PlantillaPage
+/dashboard/config-dj       → ConfigDJPage        (multi-DJ CRUD)
+/dashboard/filtros-minutas → FiltrosMinutasPage
+/                          → redirect /dashboard/borradores
 ```
-
-Rutas del Dashboard envueltas en un guard que verifica token. Si no hay token → redirect `/login`.
-
-> Eliminadas: `/dashboard/aprobados`, `/dashboard/confirmados`, `/dashboard/alertas`, `/dashboard/audit`.
 
 ## Tipos de dominio (`src/types/domain.ts`)
 
 ```ts
-// MVP: solo dos estados
-type EstadoMinuta = 'BORRADOR' | 'ENVIADO'
-type TipoOperacion = 'COMPRA' | 'VENTA'
-type Liquidacion = 'CI' | '24HS' | '48HS'
+type EstadoMinuta = "BORRADOR" | "ENVIADO" | "FILTRADA"
 
 interface Minuta {
   id: string
+  // Del Excel
   cliente_nombre: string
-  cliente_email: string
   cuenta_comitente: string
   cuenta_cotapartista: string
+  id_orden: number
+  fecha_operacion: string      // ISO datetime
+  fecha_liquidacion: string
+  operacion: string
   instrumento: string
-  tipo: TipoOperacion
-  cantidad: number
-  precio: number
   moneda: string
-  liquidacion: Liquidacion
-  fecha_operacion: string  // ISO 8601
+  cantidad: number             // -1 = N/A
+  precio: number               // -1 = N/A
+  monto: number
+  estado_orden: string
+  cantidad_operada: number     // -1 = N/A
+  precio_operado: number       // -1 = N/A
+  operador: string
+  origen: string
+  asesor: string
+  requiere_conformidad: number // 0 | 1
+  // De sesión
   dj_aplicada: boolean
-  dj_texto: string | null  // texto de alerta DJ si aplica
+  dj_texto: string | null
   estado: EstadoMinuta
+  filtro_motivo: string | null
   texto_minuta: string
   texto_editado: boolean
   creado_en: string
 }
 
-// ADR-0007: tipos de DJ extendidos
-type LogicaDJ = 'OR' | 'AND'
-type OperadorDJ = '>' | '<' | '=' | '!=' | '>=' | '<='
-type CampoDJ = 'cantidad' | 'precio' | 'moneda' | 'liquidacion' | 'tipo' | 'instrumento'
+type CampoRegla =
+  | "operacion" | "operador" | "origen" | "estado" | "moneda" | "instrumento"
+  | "cantidad" | "precio" | "monto" | "cantidad_operada" | "precio_operado" | "requiere_conformidad"
 
-interface ReglaDJ {
-  campo: CampoDJ
-  operador: OperadorDJ
+type OperadorRegla = "=" | "!=" | ">" | "<" | ">=" | "<="
+
+interface ReglaConfig {
+  campo: CampoRegla
+  operador: OperadorRegla
   valor: string
 }
 
 interface ConfigDJ {
+  id?: number
+  nombre: string
   activa: boolean
   incluir_texto_en_minuta: boolean
   texto_alerta: string
-  reglas: ReglaDJ[]
-  logica: LogicaDJ
+  reglas: ReglaConfig[]
+  logica: "AND" | "OR"
+  activar_si_requiere_conformidad: boolean
 }
 
-interface Plantilla {
-  texto: string
+interface ConfigFiltros {
+  reglas: ReglaConfig[]
+  logica: "AND" | "OR"
 }
 ```
-
-> `AuditEvent` y `Orden` (con persistencia DB) viven solo en `con-db(f2)`.
 
 ## Estado del servidor — TanStack Query
 
-Query por solapa:
-```ts
-useQuery({ queryKey: ['minutas', estado], queryFn: () => fetchMinutas(estado) })
-```
+Query keys exactas:
 
-Tras marcar como enviado, invalidar:
-```ts
-useMutation({
-  mutationFn: marcarEnviado,
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['minutas', 'BORRADOR'] })
-    queryClient.invalidateQueries({ queryKey: ['minutas', 'ENVIADO'] })
-  }
-})
-```
+| Key | Datos |
+|-----|-------|
+| `['minutas', 'BORRADOR']` | Minutas en borrador |
+| `['minutas', 'ENVIADO']` | Minutas enviadas |
+| `['minutas', 'FILTRADA']` | Minutas filtradas |
+| `['plantilla']` | Plantilla de texto |
+| `['config-dj']` | Array de ConfigDJ (multi-DJ) |
+| `['config', 'filtros-minutas']` | ConfigFiltros singleton |
 
-Query keys MVP: `['minutas', 'BORRADOR']`, `['minutas', 'ENVIADO']`, `['plantilla']`, `['config-dj']`.
+ConfigDJ es **multi-row** (array). Usar `useConfigDJList()` — no existe hook singular.
+Invalidar minutas de todos los estados: `queryClient.invalidateQueries({ queryKey: ['minutas'] })`.
 
-No usar `useState` para datos que vienen del servidor. Solo `useState` para estado de UI (drawer abierto/cerrado, paso del modal de upload).
+Hooks en `useSession.ts`:
+- `usePlantilla()`, `useGuardarPlantilla()`
+- `useConfigDJList()`, `useCrearConfigDJ()`, `useActualizarConfigDJ()`, `useEliminarConfigDJ()`
+- `useConfigFiltros()`, `usePatchConfigFiltros()`
+- `useAgregarFiltrada()`, `useAgregarTodasFiltradas()`
 
-## Axios (`src/services/api.ts`)
+## Sidebar
 
-- Instancia única con `baseURL = import.meta.env.VITE_API_URL`
-- Interceptor de request: añade `Authorization: Bearer <token>` desde variable en módulo (no localStorage)
-- Interceptor de response: si 401 → intenta refresh token → si falla → redirect `/login` y limpia tokens
+Orden de ítems:
+1. Borradores — badge con conteo
+2. Enviados — badge con conteo
+3. Filtradas — sin badge
+4. `<Separator />`
+5. Plantilla Estándar
+6. Config DJ
+7. Filtros de Minutas
+
+Footer: botón "Subir Excel" + avatar MO + íconos (cambiar contraseña / regenerar TOTP / logout).
+
+## Naming
+
+- Componentes: PascalCase (`MinutaCard`, `ExcelUploadModal`)
+- Hooks: `use` + camelCase (`useConfigDJList`, `useAgregarFiltrada`)
+- Servicios: camelCase (`fetchAllConfigDJ`, `eliminarConfigDJ`)
+- Archivos: nombre igual al export default
 
 ## Autenticación
 
-- `access_token` almacenado en variable de módulo en `src/services/api.ts` (no en localStorage ni sessionStorage)
-- Flujo login: POST `/auth/login` → si `pending_2fa: true` → redirect `/login/2fa` → POST `/auth/verify-2fa` → guardar token → redirect `/dashboard/borradores`
-- Logout: POST `/auth/logout` + limpiar variable de token + redirect `/login`
-
-## Layout
-
-- Sidebar fija de 240px a la izquierda, contenido principal ocupa el resto
-- Sidebar muestra badge con contador en: Borradores, Enviados
-- Items de navegación: Borradores | Enviados | — | Plantilla Estándar | Config DJ
-- Botón "Subir Excel" en la parte inferior del sidebar, sobre el avatar/logout
-- `AppLayout.tsx` usa `<Outlet />` de React Router para el contenido
-
-## MinutaCard
-
-Campos visibles en la card:
-- Nombre del cliente
-- Instrumento + badge de tipo (COMPRA=verde, VENTA=rojo)
-- `cantidad × precio moneda` (ej: `100 × $1.250,00 ARS`)
-- Condición de liquidación
-- Fecha y hora de operación (formato `dd/MM/yyyy HH:mm`)
-- Badge de estado (BORRADOR / ENVIADO)
-- Ícono ⚠ si `dj_aplicada = true`
-- Ícono lápiz si `texto_editado = true`
-
-Click en card → abre `MinutaDrawer`.
-
-## MinutaDrawer
-
-- Ancho 600px, se abre desde la derecha
-- Header: nombre cliente + cuentas + badge estado
-- Textarea editable solo cuando `estado === 'BORRADOR'`; en ENVIADO modo lectura
-- Botón "Copiar contenido" (Clipboard API nativa) — visible siempre
-- Badge "Editado manualmente" visible si `texto_editado = true`
-- Sección DJ colapsable si `dj_aplicada = true` — muestra ⚠ + texto de alerta
-- Acciones según estado:
-  - BORRADOR → [Guardar edición] [Copiar contenido] [Enviado]
-  - ENVIADO → [Copiar contenido]
-- Sin sección Audit Trail en el MVP
-
-## ExcelUploadModal
-
-4 pasos con estado local (`useState`):
-1. Selección de archivo (drag & drop + input `accept=".xlsx"`)
-2. Preview: N órdenes, N válidas, N errores. Lista de errores por fila.
-3. Spinner durante POST a `/uploads/`
-4. Resultado: "X Minutas generadas." → cerrar modal → `invalidateQueries(['minutas', 'BORRADOR'])`
+- Tokens en variable de módulo en `api.ts` — NO localStorage ni sessionStorage
+- Flujo: POST `/auth/login` → pending_2fa → POST `/auth/verify-2fa` → guardar token
+- 401 → intenta refresh → si falla → clear token + redirect `/login`
 
 ## Formateo de fechas
 
 ```ts
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-
 format(new Date(fecha_operacion), 'dd/MM/yyyy HH:mm', { locale: es })
 ```
 
-## Inserción de variables en textarea (PlantillaPage / ConfigDJPage)
-
-Patrón para insertar un token `{variable}` en la posición del cursor:
-
-```ts
-const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-function insertarVariable(variable: string) {
-  const el = textareaRef.current
-  if (!el) return
-  const start = el.selectionStart
-  const end = el.selectionEnd
-  const nuevo = texto.slice(0, start) + variable + texto.slice(end)
-  setTexto(nuevo)
-  requestAnimationFrame(() => {
-    el.focus()
-    const pos = start + variable.length
-    el.setSelectionRange(pos, pos)
-  })
-}
-```
-
-- `requestAnimationFrame` necesario para restaurar el foco después del re-render.
-- Pasar `ref={textareaRef}` al componente `<Textarea>`.
-
 ## Variable de entorno
 
-`VITE_API_URL` en `frontend/.env` (no commitear). Valor de desarrollo: `http://localhost:8000`.
+`VITE_API_URL` en `frontend/.env` (no commitear). Dev: `http://localhost:8000`.
