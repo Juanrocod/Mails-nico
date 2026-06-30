@@ -4,14 +4,13 @@
 Aceptado
 
 ## Contexto
-Se evaluaron dos stacks principales para el desarrollo: .NET (C#) + React, alineado con el ecosistema Microsoft del broker, y Python FastAPI + React. El desarrollador principal es Claude Code (IA).
+Se evaluaron dos stacks: Node.js + React (unificado en JS) y Python FastAPI + React. El proyecto parte de la base de Mails-finanzas que ya usa FastAPI + React.
 
 ## Decisión
-Python FastAPI para el backend, React para el frontend.
+Python FastAPI para el backend, React 18 + TypeScript para el frontend.
 
 ## Consecuencias
-- **Positivo:** FastAPI permite desarrollo más rápido con menos boilerplate que .NET para este tipo de aplicación.
-- **Positivo:** El ecosistema Python tiene excelentes librerías para procesamiento de Excel (openpyxl, pandas), generación de PDF y autenticación.
-- **Positivo:** La integración con Microsoft Graph API (Fase 2) tiene SDK oficial para Python.
-- **Neutro:** La integración con Azure es igual de completa desde Python que desde .NET.
-- **Negativo:** Si el broker tiene equipos internos de .NET, el mantenimiento futuro puede requerir capacitación.
+- **Positivo:** Reutiliza la base de código de Mails-finanzas (auth, excel parser, estructura de proyecto).
+- **Positivo:** El ecosistema Python tiene excelentes librerías para Excel (openpyxl, pandas), email (smtplib, imaplib) y templates (Jinja2, premailer).
+- **Positivo:** FastAPI soporta SSE y background tasks asyncio nativamente, necesarios para el progreso de envío y el IMAP Watcher.
+- **Neutro:** React con shadcn/ui ya está configurado y probado en el proyecto base.

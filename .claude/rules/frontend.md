@@ -19,98 +19,98 @@ paths:
 
 ```
 src/
-├── pages/          ← LoginPage, TwoFactorPage, RegisterPage, ResetPasswordPage,
-│                     DashboardPage, FiltradaPage, PlantillaPage, ConfigDJPage, FiltrosMinutasPage
+├── pages/          ← LoginPage, NuevoEnvioPage, SeguimientoPage,
+│                     MaestroPage, PlantillaPage, ConfiguracionPage
 ├── components/
 │   ├── layout/     ← AppLayout.tsx, Sidebar.tsx, AuthGuard.tsx, ErrorBoundary.tsx
-│   ├── minutas/    ← MinutaCard.tsx, MinutaDrawer.tsx
-│   ├── upload/     ← ExcelUploadModal.tsx
-│   ├── profile/    ← ChangePasswordModal.tsx, RegenerateTOTPModal.tsx
+│   ├── envios/     ← EnvioCard.tsx, EnvioDrawer.tsx
+│   ├── upload/     ← ExcelUploadModal.tsx, ProgresoEnvio.tsx
+│   ├── profile/    ← ChangePasswordModal.tsx
 │   └── ui/         ← shadcn/ui (auto-generados, no editar a mano)
-├── services/       ← api.ts, auth.ts, minutas.ts, upload.ts, plantilla.ts, configDJ.ts, configFiltros.ts
-├── hooks/          ← useAuth.ts, useSession.ts
+├── services/       ← api.ts, auth.ts, ciclos.ts, maestro.ts, envios.ts, plantilla.ts
+├── hooks/          ← useAuth.ts, useCiclo.ts, useEnvios.ts
 └── types/          ← domain.ts (única fuente de verdad de tipos)
 ```
 
 ## Rutas (App.tsx)
 
 ```
-/login                     → LoginPage
-/login/2fa                 → TwoFactorPage
-/register                  → RegisterPage
-/reset-password            → ResetPasswordPage
-/dashboard/borradores      → DashboardPage (estado="BORRADOR")
-/dashboard/enviados        → DashboardPage (estado="ENVIADO")
-/dashboard/filtradas       → FiltradaPage
-/dashboard/plantilla       → PlantillaPage
-/dashboard/config-dj       → ConfigDJPage        (multi-DJ CRUD)
-/dashboard/filtros-minutas → FiltrosMinutasPage
-/                          → redirect /dashboard/borradores
+/login                        → LoginPage
+/nuevo-envio/para-enviar      → NuevoEnvioPage (tab="PARA_ENVIAR")
+/nuevo-envio/sin-email        → NuevoEnvioPage (tab="SIN_EMAIL")
+/nuevo-envio/filtrados        → NuevoEnvioPage (tab="FILTRADO")
+/seguimiento/no-contestados   → SeguimientoPage (tab="NO_CONTESTADO")
+/seguimiento/contestados      → SeguimientoPage (tab="CONTESTADO")
+/seguimiento/pagos            → SeguimientoPage (tab="PAGO")
+/seguimiento/rebotados        → SeguimientoPage (tab="REBOTADO")
+/maestro                      → MaestroPage
+/plantilla                    → PlantillaPage
+/configuracion                → ConfiguracionPage
+/                             → redirect /seguimiento/no-contestados
 ```
 
 ## Tipos de dominio (`src/types/domain.ts`)
 
 ```ts
-type EstadoMinuta = "BORRADOR" | "ENVIADO" | "FILTRADA"
+type EstadoEnvio = "NO_CONTESTADO" | "CONTESTADO" | "PAGO" | "REBOTADO" | "SIN_EMAIL" | "FILTRADO"
+type MotivoFiltrado = "MONTO_MINIMO" | "DADO_DE_BAJA"
 
-interface Minuta {
+interface Envio {
   id: string
-  // Del Excel
-  cliente_nombre: string
-  cuenta_comitente: string
-  cuenta_cotapartista: string
-  id_orden: number
-  fecha_operacion: string      // ISO datetime
-  fecha_liquidacion: string
-  operacion: string
-  instrumento: string
-  moneda: string
-  cantidad: number             // -1 = N/A
-  precio: number               // -1 = N/A
+  ciclo_id: string
+  clave_union: string
+  nombre: string
+  localidad: string
   monto: number
-  estado_orden: string
-  cantidad_operada: number     // -1 = N/A
-  precio_operado: number       // -1 = N/A
-  operador: string
-  origen: string
-  asesor: string
-  requiere_conformidad: number // 0 | 1
-  // De sesión
-  dj_aplicada: boolean
-  dj_texto: string | null
-  estado: EstadoMinuta
-  filtro_motivo: string | null
-  texto_minuta: string
-  texto_editado: boolean
+  email: string | null
+  estado: EstadoEnvio
+  motivo_filtrado: MotivoFiltrado | null
+  message_id: string | null
+  enviado_en: string | null
+  reply_en: string | null
+  reply_snippet: string | null
+  tiene_adjunto: boolean
+  ciclo_numero: number
+}
+
+interface Ciclo {
+  id: string
+  nombre_archivo: string
+  total_deudores: number
+  para_enviar: number
+  sin_email: number
+  filtrados: number
+  activo: boolean
   creado_en: string
 }
 
-type CampoRegla =
-  | "operacion" | "operador" | "origen" | "estado" | "moneda" | "instrumento"
-  | "cantidad" | "precio" | "monto" | "cantidad_operada" | "precio_operado" | "requiere_conformidad"
-
-type OperadorRegla = "=" | "!=" | ">" | "<" | ">=" | "<="
-
-interface ReglaConfig {
-  campo: CampoRegla
-  operador: OperadorRegla
-  valor: string
-}
-
-interface ConfigDJ {
-  id?: number
+interface ClienteMaestro {
+  id: string
+  clave_union: string
   nombre: string
-  activa: boolean
-  incluir_texto_en_minuta: boolean
-  texto_alerta: string
-  reglas: ReglaConfig[]
-  logica: "AND" | "OR"
-  activar_si_requiere_conformidad: boolean
+  email: string
+  activo: boolean
+  prefiere_no_recibir_email: boolean
+  actualizado_en: string
 }
 
-interface ConfigFiltros {
-  reglas: ReglaConfig[]
-  logica: "AND" | "OR"
+interface Plantilla {
+  asunto: string
+  cuerpo: string
+  monto_minimo: number
+  logo_url: string | null
+  color_primario: string
+  nombre_empresa: string
+  pie_email: string
+}
+
+interface PreviewCiclo {
+  para_enviar: number
+  sin_email: number
+  filtrados: number
+  items_para_enviar: Envio[]
+  items_sin_email: Envio[]
+  items_filtrados: Envio[]
 }
 ```
 
@@ -120,46 +120,60 @@ Query keys exactas:
 
 | Key | Datos |
 |-----|-------|
-| `['minutas', 'BORRADOR']` | Minutas en borrador |
-| `['minutas', 'ENVIADO']` | Minutas enviadas |
-| `['minutas', 'FILTRADA']` | Minutas filtradas |
-| `['plantilla']` | Plantilla de texto |
-| `['config-dj']` | Array de ConfigDJ (multi-DJ) |
-| `['config', 'filtros-minutas']` | ConfigFiltros singleton |
+| `['ciclo', 'activo']` | Ciclo activo actual |
+| `['envios', estado]` | Envios por estado del ciclo activo |
+| `['maestro']` | Lista de ClienteMaestro |
+| `['plantilla']` | Plantilla singleton |
 
-ConfigDJ es **multi-row** (array). Usar `useConfigDJList()` — no existe hook singular.
-Invalidar minutas de todos los estados: `queryClient.invalidateQueries({ queryKey: ['minutas'] })`.
+Hooks en `useCiclo.ts`:
+- `useCicloActivo()`, `usePreviewCiclo()`, `useConfirmarEnvio()`
 
-Hooks en `useSession.ts`:
-- `usePlantilla()`, `useGuardarPlantilla()`
-- `useConfigDJList()`, `useCrearConfigDJ()`, `useActualizarConfigDJ()`, `useEliminarConfigDJ()`
-- `useConfigFiltros()`, `usePatchConfigFiltros()`
-- `useAgregarFiltrada()`, `useAgregarTodasFiltradas()`
+Hooks en `useEnvios.ts`:
+- `useEnviosPorEstado(estado)`, `useMoverAPago(id)`, `useConteoEnvios()`
+
+Invalidar todos los envios: `queryClient.invalidateQueries({ queryKey: ['envios'] })`.
 
 ## Sidebar
 
-Orden de ítems:
-1. Borradores — badge con conteo
-2. Enviados — badge con conteo
-3. Filtradas — sin badge
-4. `<Separator />`
-5. Plantilla Estándar
-6. Config DJ
-7. Filtros de Minutas
+```
+[ Seguimiento ]         ← header de sección
+  No contestados  (N)   ← badge con conteo
+  Contestados     (N)
+  Pagos           (N)
+  Rebotados       (N)
+────────────────────
+[ Gestión ]
+  Nuevo Envío
+  Maestro de Clientes
+  Plantilla
+  Configuración
+```
 
-Footer: botón "Subir Excel" + avatar MO + íconos (cambiar contraseña / regenerar TOTP / logout).
+Footer: avatar del operario + íconos (cambiar contraseña / logout).
+
+## SSE — Progreso de envío
+
+```ts
+// En ProgresoEnvio.tsx
+const eventSource = new EventSource('/ciclos/enviar-stream', { withCredentials: true })
+eventSource.onmessage = (e) => {
+  const envio: Envio = JSON.parse(e.data)
+  setEnviados(prev => [...prev, envio])
+}
+eventSource.onerror = () => eventSource.close()
+```
 
 ## Naming
 
-- Componentes: PascalCase (`MinutaCard`, `ExcelUploadModal`)
-- Hooks: `use` + camelCase (`useConfigDJList`, `useAgregarFiltrada`)
-- Servicios: camelCase (`fetchAllConfigDJ`, `eliminarConfigDJ`)
+- Componentes: PascalCase (`EnvioCard`, `ProgresoEnvio`)
+- Hooks: `use` + camelCase (`useCicloActivo`, `useEnviosPorEstado`)
+- Servicios: camelCase (`fetchEnviosPorEstado`, `confirmarEnvio`)
 - Archivos: nombre igual al export default
 
 ## Autenticación
 
 - Tokens en variable de módulo en `api.ts` — NO localStorage ni sessionStorage
-- Flujo: POST `/auth/login` → pending_2fa → POST `/auth/verify-2fa` → guardar token
+- Flujo: POST `/auth/login` → guardar token (sin 2FA, respuesta directa)
 - 401 → intenta refresh → si falla → clear token + redirect `/login`
 
 ## Formateo de fechas
@@ -167,7 +181,7 @@ Footer: botón "Subir Excel" + avatar MO + íconos (cambiar contraseña / regene
 ```ts
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-format(new Date(fecha_operacion), 'dd/MM/yyyy HH:mm', { locale: es })
+format(new Date(enviado_en), 'dd/MM/yyyy HH:mm', { locale: es })
 ```
 
 ## Variable de entorno

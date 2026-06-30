@@ -1,4 +1,4 @@
-# CONTEXT.md — Sistema de Gestión de Órdenes Bursátiles
+# CONTEXT.md — Sistema de Cobro Automático por Mail
 
 ## Propósito
 
@@ -8,92 +8,86 @@ Glosario canónico del dominio. Sin detalles de implementación.
 
 ## Términos del Dominio
 
-### Orden
-Una instrucción de compra o venta de un instrumento financiero generada a partir del Excel de operaciones. Unidad central del sistema. Una Orden tiene un único Cliente destinatario.
+### Consorcio
+Cliente de la empresa de mantenimiento de ascensores. Unidad destinataria de los mails de cobro. Tiene un nombre, un mail de contacto y una clave de unión que lo identifica en el sistema de facturación del cliente.
 
-### Minuta
-El mail que el sistema genera a partir de los datos de una Orden. Contiene todos los campos de la operación en texto plano, bien estructurado. Puede incluir una Declaración Jurada si corresponde.
+### Deudor
+Un Consorcio que aparece en el Excel de deudores de un ciclo determinado. Tiene un monto adeudado y puede recibir un mail de recordatorio de cobro.
 
-### Excel de Operaciones
-Archivo exportado por Middle Office desde la plataforma bursátil. Tiene estructura de columnas fija. Es el único punto de entrada de datos al sistema en Fase 1.
+### Maestro de Clientes
+Tabla persistente en la DB que contiene los datos de todos los Consorcios: clave de unión, nombre, mail, y estado de baja voluntaria. Es la fuente de verdad para los mails. Se actualiza cuando el operario sube el Excel maestro.
 
-### Middle Office
-La persona interna responsable de todo el flujo: descarga el Excel de la plataforma bursátil, lo sube al sistema, audita y corrige los borradores de Minuta en el Dashboard, y los envía manualmente al Cliente.
+### Excel de Deudores
+Archivo exportado del sistema de facturación del cliente. Contiene la lista de Consorcios que deben dinero en ese momento, con su monto. Se sube cada ~15 días para iniciar un nuevo Ciclo. Estructura a confirmar con el cliente.
 
-### Sales Trader
-Actor externo al sistema en Fase 1. Ejecuta las operaciones en la plataforma bursátil. No interactúa directamente con este sistema en el MVP.
+### Excel Maestro
+Archivo con la lista completa de Consorcios y sus mails. Relativamente estable; se sube una vez y se actualiza solo cuando cambian datos de clientes.
 
-### Cliente
-Persona o entidad que recibe la Minuta por mail. Debe confirmar la operación respondiendo el mail. Tiene un número de Cuenta Comitente y un número de Cuenta Cotapartista asociados.
+### Ciclo
+Unidad de trabajo del sistema. Cada vez que el operario sube un Excel de deudores y confirma el envío, se crea un nuevo Ciclo. Solo hay un Ciclo activo a la vez. Los Ciclos anteriores se archivan pero sus Envios se conservan en la DB para tracking histórico.
 
-### Cuenta Comitente
-Número de cuenta del Cliente en el broker. Identifica al cliente en el sistema bursátil.
+### Preview
+Resultado del procesamiento del Excel de deudores antes de confirmar el envío. Se calcula en memoria y muestra cuántos Envios quedan para enviar, cuántos no tienen mail y cuántos están filtrados. Nada se guarda en DB durante el preview.
 
-### Cuenta Cotapartista
-Número de cuenta de la contraparte del Cliente en la operación. Figura en la Minuta.
+### Envio
+Registro de un mail a un Deudor dentro de un Ciclo. Tiene un estado, el `message_id` SMTP para tracking IMAP, y el snippet de respuesta si la hubo. Es la unidad central de seguimiento del sistema.
 
-### Declaración Jurada (DJ)
-Texto legal que se incluye en la Minuta cuando la operación cumple ciertas condiciones regulatorias. Los templates y reglas de activación se definen por configuración. Puede ser activada automáticamente por el sistema o manualmente.
+### Plantilla
+Template HTML configurable del mail de cobro. Contiene asunto, cuerpo con variables, diseño (logo, color primario, nombre empresa) y el monto mínimo de filtrado. Variables disponibles: `{{nombre}}`, `{{monto}}`, `{{localidad}}`, `{{clave_union}}`, `{{fecha_envio}}`.
 
-### Dashboard
-Interfaz web de Middle Office. Organizada en solapas por estado de las Minutas. Permite auditar, editar, aprobar y enviar cada Minuta.
+### Rate Limiting SMTP
+Restricción de velocidad de envío impuesta por diseño: 5 mails cada 30 segundos. Evita que Yahoo bloquee la cuenta por envío masivo.
 
-### Borrador
-Estado inicial de una Minuta recién generada por el sistema a partir del Excel. Visible en el Dashboard, pendiente de revisión por Middle Office.
+### IMAP Watcher
+Proceso de background que hace polling al inbox de Yahoo cada 10 minutos para detectar respuestas a los Envios enviados. Usa el header `In-Reply-To` / `References` para vincular respuestas con Envios por `message_id`.
 
-### Aprobación
-Acción de Middle Office en el Dashboard que habilita el envío manual de una Minuta al Cliente. Queda registrada en el Audit Trail con usuario, timestamp e indicador de si el contenido fue editado.
+### Reply Classifier
+Módulo que analiza cada respuesta detectada por el IMAP Watcher y determina su tipo: con adjunto (imagen o PDF) → PAGO, texto solo → CONTESTADO, remitente mailer-daemon/postmaster → REBOTADO.
 
-### Confirmación
-Respuesta del Cliente al mail de la Minuta, indicando su aceptación de la operación. En Fase 1 se registra manualmente. En Fase 2 se detecta automáticamente.
+### Rebote
+Mail que no pudo ser entregado. El servidor destino envía un aviso automático al remitente (desde `mailer-daemon` o `postmaster`). El IMAP Watcher lo detecta y marca el Envio como REBOTADO. Los rebotes no se reintentan.
 
-### Audit Trail
-Registro inmutable de todas las acciones sobre una Orden: creación, aprobación, edición, envío, confirmación. Incluye usuario, IP y timestamp. Exportable a PDF/Excel.
+### Dado de Baja
+Consorcio que clickeó el link de unsubscribe en un mail recibido. El flag `prefiere_no_recibir_email` se setea en el Maestro de Clientes y nunca se sobreescribe con uploads futuros. En cada nuevo Ciclo, estos Consorcios van automáticamente a FILTRADO con motivo DADO_DE_BAJA.
 
-### Plataforma Bursátil
-Sistema externo del que Middle Office exporta el Excel de Operaciones. No tiene integración API en Fase 1.
+### ciclo_numero
+Campo en Envio que registra en cuántos ciclos consecutivos ese Consorcio estuvo como deudor sin contestar. Base de datos para la funcionalidad de multi-plantilla de Fase 2 (escalado de tono según historial).
 
----
-
-## Estados de una Minuta
-
-```
-BORRADOR → APROBADO → ENVIADO → CONFIRMADO
-                                     ↑
-                              (Fase 2: automático)
-                              (Fase 1: manual)
-```
-
-| Estado | Descripción |
-|--------|-------------|
-| BORRADOR | Generado por el sistema, pendiente de revisión |
-| APROBADO | Revisado y aprobado por Middle Office, listo para envío manual |
-| ENVIADO | Enviado al Cliente, esperando confirmación |
-| CONFIRMADO | Cliente respondió confirmando la operación |
-| ALERTA | Sin respuesta del Cliente después del umbral de tiempo definido |
+### Operario
+El único usuario del sistema en el MVP. Dueño de la empresa de mantenimiento de ascensores. Gestiona el maestro, sube los Excels de deudores y supervisa el seguimiento de respuestas.
 
 ---
 
-## Campos de una Orden / Minuta
+## Estados de un Envio
 
-- Cliente (nombre)
-- Mail del Cliente
-- N° Cuenta Comitente
-- N° Cuenta Cotapartista
-- Instrumento financiero
-- Tipo de operación (Compra / Venta)
-- Cantidad
-- Precio
-- Moneda
-- Condición de liquidación (24hs / 48hs / CI)
-- Declaración Jurada (si corresponde)
-- Fecha y hora de la operación
+```
+NO_CONTESTADO → CONTESTADO  (respuesta sin adjunto detectada por IMAP Watcher)
+NO_CONTESTADO → PAGO        (respuesta con adjunto detectada por IMAP Watcher)
+NO_CONTESTADO → REBOTADO    (bounce de mailer-daemon detectado por IMAP Watcher)
+CONTESTADO    → PAGO        (override manual del Operario desde el dashboard)
+```
+
+Estados especiales (registrados en DB al confirmar el envío, sin mail enviado):
+
+| Estado | Motivo |
+|--------|--------|
+| `FILTRADO` / `MONTO_MINIMO` | Monto debajo del umbral configurado en Plantilla |
+| `FILTRADO` / `DADO_DE_BAJA` | Consorcio con `prefiere_no_recibir_email = true` |
+| `SIN_EMAIL` | Clave de unión del Excel sin match en Maestro de Clientes |
+
+---
+
+## Secciones del Dashboard
+
+| Sección | Solapas |
+|---------|---------|
+| Nuevo Envío | Para enviar · Sin Email · Filtrados |
+| Seguimiento | No contestados · Contestados · Pagos · Rebotados |
 
 ---
 
 ## Pendientes de Definición
 
-- Estructura exacta de columnas del Excel (compartir modelo cuando esté disponible)
-- Templates y reglas de activación de la Declaración Jurada
-- Infraestructura de hosting (Azure, a confirmar con el broker)
-- Integración con back-office / API de clientes (Fase futura)
+- Columnas exactas y nombre de la clave de unión del Excel de deudores
+- Columnas exactas y nombre de la clave de unión del Excel maestro
+- App password de Yahoo del cliente (generada desde la cuenta Yahoo)
