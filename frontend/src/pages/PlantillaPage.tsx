@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { getPlantilla, updatePlantilla } from "../services/plantilla";
 import type { Plantilla } from "../types/domain";
+
+const VARIABLES = [
+  "{{nombre}}",
+  "{{monto}}",
+  "{{localidad}}",
+  "{{clave_union}}",
+  "{{fecha_envio}}",
+];
 
 const DEFAULTS: Plantilla = {
   asunto: "Recordatorio de deuda",
@@ -18,6 +26,21 @@ const DEFAULTS: Plantilla = {
 export default function PlantillaPage() {
   const [form, setForm] = useState<Plantilla>(DEFAULTS);
   const [status, setStatus] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function insertarVariable(variable: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? form.cuerpo_html.length;
+    const end = el.selectionEnd ?? form.cuerpo_html.length;
+    const next = form.cuerpo_html.slice(0, start) + variable + form.cuerpo_html.slice(end);
+    set("cuerpo_html", next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + variable.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   useEffect(() => {
     getPlantilla().then(setForm).catch(console.error);
@@ -45,11 +68,20 @@ export default function PlantillaPage() {
         <Input value={form.asunto} onChange={(e) => set("asunto", e.target.value)} />
 
         <label className="block text-sm font-medium">Cuerpo HTML</label>
-        <p className="text-xs text-gray-500">
-          Variables: {"{{nombre}}"}, {"{{monto}}"}, {"{{localidad}}"}, {"{{clave_union}}"},{" "}
-          {"{{fecha_envio}}"}
-        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {VARIABLES.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => insertarVariable(v)}
+              className="px-2 py-1 text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200 transition-colors"
+            >
+              {v}
+            </button>
+          ))}
+        </div>
         <Textarea
+          ref={textareaRef}
           rows={8}
           value={form.cuerpo_html}
           onChange={(e) => set("cuerpo_html", e.target.value)}
