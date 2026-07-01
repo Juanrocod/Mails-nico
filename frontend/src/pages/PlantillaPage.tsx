@@ -1,8 +1,7 @@
 // frontend/src/pages/PlantillaPage.tsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Textarea } from '../components/ui/textarea'
 import { Button } from '../components/ui/button'
-import { usePlantilla, useGuardarPlantilla } from '../hooks/useSession'
 
 const VARIABLES: { label: string; token: string }[] = [
   { label: 'Nombre cliente',    token: '{cliente_nombre}' },
@@ -22,15 +21,9 @@ const VARIABLES: { label: string; token: string }[] = [
 ]
 
 export default function PlantillaPage() {
-  const { data, isLoading } = usePlantilla()
-  const guardar = useGuardarPlantilla()
   const [texto, setTexto] = useState('')
   const [saved, setSaved] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (data) setTexto(data.texto)
-  }, [data])
 
   function insertarVariable(token: string) {
     const el = textareaRef.current
@@ -48,16 +41,10 @@ export default function PlantillaPage() {
   }
 
   async function handleGuardar() {
-    try {
-      await guardar.mutateAsync(texto)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch {
-      // error silenciado — el backend solo falla si no está autenticado
-    }
+    // placeholder: guardar funcionalidad removida
   }
 
-  const modificado = data ? texto !== data.texto : false
+  const modificado = false
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -83,22 +70,18 @@ export default function PlantillaPage() {
         ))}
       </div>
 
-      {isLoading ? (
-        <div className="h-64 bg-slate-100 rounded animate-pulse" />
-      ) : (
-        <Textarea
-          ref={textareaRef}
-          value={texto}
-          onChange={(e) => { setTexto(e.target.value); setSaved(false) }}
-          rows={18}
-          className="font-mono text-sm resize-none"
-          placeholder="Ingresá el texto de la plantilla estándar..."
-        />
-      )}
+      <Textarea
+        ref={textareaRef}
+        value={texto}
+        onChange={(e) => { setTexto(e.target.value); setSaved(false) }}
+        rows={18}
+        className="font-mono text-sm resize-none"
+        placeholder="Ingresá el texto de la plantilla estándar..."
+      />
 
       <div className="flex items-center gap-3">
-        <Button onClick={handleGuardar} disabled={guardar.isPending || !modificado}>
-          {guardar.isPending ? 'Guardando...' : 'Guardar plantilla'}
+        <Button onClick={handleGuardar} disabled={true}>
+          Guardar plantilla
         </Button>
         {saved && <span className="text-sm text-green-600">Guardado</span>}
       </div>
