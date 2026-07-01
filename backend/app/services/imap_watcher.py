@@ -50,41 +50,46 @@ def _poll_inbox():
         message_id_map = {e.message_id: e for e in active_envios}
 
         mail = imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
-        mail.login(settings.YAHOO_EMAIL, settings.YAHOO_APP_PASSWORD)
-        mail.select("INBOX")
+        try:
+            mail.login(settings.YAHOO_EMAIL, settings.YAHOO_APP_PASSWORD)
+            mail.select("INBOX")
 
-        since_date = cutoff.strftime("%d-%b-%Y")
-        _, data = mail.search(None, f'(SINCE "{since_date}")')
-        msg_nums = data[0].split()
+            since_date = cutoff.strftime("%d-%b-%Y")
+            _, data = mail.search(None, f'(SINCE "{since_date}")')
+            msg_nums = data[0].split()
 
-        for num in msg_nums:
-            _, msg_data = mail.fetch(num, "(RFC822)")
-            raw = msg_data[0][1]
-            msg = email.message_from_bytes(raw)
+            for num in msg_nums:
+                _, msg_data = mail.fetch(num, "(RFC822)")
+                raw = msg_data[0][1]
+                msg = email.message_from_bytes(raw)
 
-            in_reply_to = msg.get("In-Reply-To", "").strip()
-            references = msg.get("References", "").strip().split()
+                in_reply_to = msg.get("In-Reply-To", "").strip()
+                references = msg.get("References", "").strip().split()
 
-            matched_envio = message_id_map.get(in_reply_to)
-            if matched_envio is None:
-                for ref in references:
-                    matched_envio = message_id_map.get(ref.strip())
-                    if matched_envio:
-                        break
+                matched_envio = message_id_map.get(in_reply_to)
+                if matched_envio is None:
+                    for ref in references:
+                        matched_envio = message_id_map.get(ref.strip())
+                        if matched_envio:
+                            break
 
-            if matched_envio is None:
-                continue
+                if matched_envio is None:
+                    continue
 
-            new_estado = classify(msg)
-            snippet = _extract_snippet(msg)
-            matched_envio.estado = new_estado
-            matched_envio.reply_snippet = snippet
-            matched_envio.actualizado_en = datetime.now(timezone.utc)
-            db.add(matched_envio)
-            _logger.info("Envio %s → %s", matched_envio.id, new_estado)
+                new_estado = classify(msg)
+                snippet = _extract_snippet(msg)
+                matched_envio.estado = new_estado
+                matched_envio.reply_snippet = snippet
+                matched_envio.actualizado_en = datetime.now(timezone.utc)
+                db.add(matched_envio)
+                _logger.info("Envio %s → %s", matched_envio.id, new_estado)
 
-        mail.logout()
-        db.commit()
+            db.commit()
+        finally:
+            try:
+                mail.logout()
+            except Exception:
+                pass
     finally:
         db.close()
 
