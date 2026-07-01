@@ -38,7 +38,7 @@ export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoad
   function handleConfirmar() {
     if (!file) return;
     onConfirmar(file);
-    onClose();
+    handleClose();
   }
 
   function handleClose() {

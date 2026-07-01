@@ -1,14 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Button } from "../components/ui/button";
 import { ExcelUploadModal } from "../components/upload/ExcelUploadModal";
 import { ProgresoEnvio } from "../components/upload/ProgresoEnvio";
 import { useCiclo } from "../hooks/useCiclo";
+import { useState } from "react";
 import type { Envio } from "../types/domain";
+
+const PATH_TO_TAB: Record<string, string> = {
+  "/nuevo-envio/para-enviar": "para_enviar",
+  "/nuevo-envio/sin-email": "sin_email",
+  "/nuevo-envio/filtrados": "filtrados",
+};
 
 export default function NuevoEnvioPage() {
   const { enviosActivo, preview, confirmar, isLoading, progreso, loadEnviosActivo } = useCiclo();
   const [modalOpen, setModalOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activeTab = PATH_TO_TAB[location.pathname] ?? "para_enviar";
 
   useEffect(() => {
     loadEnviosActivo();
@@ -17,6 +29,15 @@ export default function NuevoEnvioPage() {
   const paraEnviar = enviosActivo.filter((e) => e.estado === "NO_CONTESTADO" && e.email);
   const sinEmail = enviosActivo.filter((e) => e.estado === "SIN_EMAIL");
   const filtrados = enviosActivo.filter((e) => e.estado === "FILTRADO");
+
+  function handleTabChange(value: string) {
+    const paths: Record<string, string> = {
+      para_enviar: "/nuevo-envio/para-enviar",
+      sin_email: "/nuevo-envio/sin-email",
+      filtrados: "/nuevo-envio/filtrados",
+    };
+    navigate(paths[value] ?? "/nuevo-envio/para-enviar");
+  }
 
   return (
     <div className="p-6 space-y-4">
@@ -31,7 +52,7 @@ export default function NuevoEnvioPage() {
         </div>
       )}
 
-      <Tabs defaultValue="para_enviar">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="para_enviar">Para enviar ({paraEnviar.length})</TabsTrigger>
           <TabsTrigger value="sin_email">Sin Email ({sinEmail.length})</TabsTrigger>

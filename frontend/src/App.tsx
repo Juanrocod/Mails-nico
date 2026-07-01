@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import PlantillaPage from './pages/PlantillaPage'
+import NuevoEnvioPage from './pages/NuevoEnvioPage'
 import AuthGuard from './components/layout/AuthGuard'
 
 export default function App() {
@@ -12,9 +13,9 @@ export default function App() {
         <Route path="/seguimiento/contestados" element={<div>Seguimiento - Contestados</div>} />
         <Route path="/seguimiento/pagos" element={<div>Seguimiento - Pagos</div>} />
         <Route path="/seguimiento/rebotados" element={<div>Seguimiento - Rebotados</div>} />
-        <Route path="/nuevo-envio/para-enviar" element={<div>Nuevo Envío - Para Enviar</div>} />
-        <Route path="/nuevo-envio/sin-email" element={<div>Nuevo Envío - Sin Email</div>} />
-        <Route path="/nuevo-envio/filtrados" element={<div>Nuevo Envío - Filtrados</div>} />
+        <Route path="/nuevo-envio/para-enviar" element={<NuevoEnvioPage />} />
+        <Route path="/nuevo-envio/sin-email" element={<NuevoEnvioPage />} />
+        <Route path="/nuevo-envio/filtrados" element={<NuevoEnvioPage />} />
         <Route path="/maestro" element={<div>Maestro de Clientes</div>} />
         <Route path="/plantilla" element={<PlantillaPage />} />
         <Route path="/configuracion" element={<div>Configuración</div>} />
