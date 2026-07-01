@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+    .header { background: {{ color_primario }}; padding: 24px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+    .body { padding: 32px; color: #333333; line-height: 1.6; }
+    .monto-box { background: #f9f9f9; border-left: 4px solid {{ color_primario }}; padding: 16px; margin: 24px 0; }
+    .monto-box .label { font-size: 13px; color: #666; }
+    .monto-box .valor { font-size: 28px; font-weight: bold; color: {{ color_primario }}; }
+    .footer { background: #f4f4f4; padding: 16px; text-align: center; font-size: 12px; color: #999; }
+    .unsubscribe { font-size: 11px; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      {% if logo_url %}
+      <img src="{{ logo_url }}" alt="{{ nombre_empresa }}" style="max-height:60px; margin-bottom:8px;"><br>
+      {% endif %}
+      <h1>{{ nombre_empresa }}</h1>
+    </div>
+    <div class="body">
+      {{ cuerpo_html | safe }}
+      <div class="monto-box">
+        <div class="label">Monto adeudado</div>
+        <div class="valor">${{ monto }}</div>
+      </div>
+      <p style="font-size:13px; color:#555;">
+        Fecha de envío: {{ fecha_envio }}<br>
+        Referencia: {{ clave_union }}
+      </p>
+    </div>
+    <div class="footer">
+      <p>{{ nombre_empresa }}</p>
+      <p class="unsubscribe">
+        Si no desea recibir más comunicaciones,
+        <a href="{{ unsubscribe_url }}">haga clic aquí para darse de baja</a>.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
