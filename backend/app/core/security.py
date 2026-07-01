@@ -2,10 +2,18 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-import pyotp
-from cryptography.fernet import Fernet
 from jose import jwt
 from sqlalchemy import TypeDecorator, String
+
+try:
+    import pyotp as _pyotp
+except ImportError:  # pyotp removed in Task 3 cleanup
+    _pyotp = None  # type: ignore[assignment]
+
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None  # type: ignore[assignment,misc]
 
 UTC = timezone.utc
 
@@ -56,15 +64,18 @@ def decode_token(token: str) -> dict:
 
 
 def generate_totp_secret() -> str:
-    return pyotp.random_base32()
+    assert _pyotp is not None, "pyotp not installed"
+    return _pyotp.random_base32()
 
 
 def verify_totp(secret: str, code: str) -> bool:
-    return pyotp.TOTP(secret).verify(code, valid_window=1)
+    assert _pyotp is not None, "pyotp not installed"
+    return _pyotp.TOTP(secret).verify(code, valid_window=1)
 
 
 def get_totp_provisioning_uri(secret: str, username: str, issuer: str) -> str:
-    return pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name=issuer)
+    assert _pyotp is not None, "pyotp not installed"
+    return _pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name=issuer)
 
 
 def create_totp_setup_token(user_id: str, invite_token_id: str) -> str:

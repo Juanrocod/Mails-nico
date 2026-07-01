@@ -5,18 +5,15 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# Add backend/ to path so app imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.config import settings
 from app.core.database import Base
-
-# Import all models so they register with Base.metadata
 from app.models.user import User
 from app.models.plantilla import Plantilla
-from app.models.config_dj import ConfigDJ
-from app.models.config_filtros import ConfigFiltros
-from app.models.invite_token import InviteToken
+from app.models.cliente_maestro import ClienteMaestro
+from app.models.ciclo import Ciclo
+from app.models.envio import Envio
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
@@ -46,10 +43,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
 
