@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { LogOut, KeyRound } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
@@ -42,7 +42,18 @@ function NavItem({
 }
 
 export default function Sidebar() {
-  const { handleLogout } = useAuth()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      // continuar aunque falle la red — siempre limpiar estado local
+    } finally {
+      navigate('/login')
+    }
+  }
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white flex flex-col">

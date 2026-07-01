@@ -1,28 +1,18 @@
-import { useNavigate } from 'react-router-dom'
-import { login, logout as logoutApi } from '../services/auth'
-import { getAccessToken } from '../services/api'
+import { useState, useCallback } from "react";
+import { login as apiLogin, logout as apiLogout } from "../services/auth";
 
 export function useAuth() {
-  const navigate = useNavigate()
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("access_token"));
 
-  async function handleLogin(username: string, password: string): Promise<void> {
-    await login(username, password)
-    navigate('/seguimiento/no-contestados')
-  }
+  const login = useCallback(async (username: string, password: string) => {
+    await apiLogin(username, password);
+    setIsAuthenticated(true);
+  }, []);
 
-  async function handleLogout(): Promise<void> {
-    try {
-      await logoutApi()
-    } catch {
-      // continuar aunque falle la red — siempre limpiar estado local
-    } finally {
-      navigate('/login')
-    }
-  }
+  const logout = useCallback(async () => {
+    await apiLogout();
+    setIsAuthenticated(false);
+  }, []);
 
-  function isAuthenticated(): boolean {
-    return getAccessToken() !== null
-  }
-
-  return { handleLogin, handleLogout, isAuthenticated }
+  return { isAuthenticated, login, logout };
 }
