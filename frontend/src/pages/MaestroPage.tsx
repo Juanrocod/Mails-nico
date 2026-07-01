@@ -18,7 +18,7 @@ export default function MaestroPage() {
     try {
       const r = await uploadMaestro(file);
       setStatus(`Listo: ${r.nuevos} nuevos, ${r.actualizados} actualizados`);
-      getMaestro().then(setClientes);
+      getMaestro().then(setClientes).catch(console.error);
     } catch {
       setStatus("Error al subir el archivo");
     }
