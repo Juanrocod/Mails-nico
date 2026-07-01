@@ -1,89 +1,104 @@
-import { useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog'
-import { Button } from '../ui/button'
-import { cn } from '../../lib/utils'
+import { useRef, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Button } from "../ui/button";
+import type { PreviewCiclo } from "../../types/domain";
 
 interface Props {
-  open: boolean
-  onClose: () => void
+  open: boolean;
+  onClose: () => void;
+  onPreview: (file: File) => Promise<PreviewCiclo>;
+  onConfirmar: (file: File) => void;
+  isLoading: boolean;
 }
 
-export default function ExcelUploadModal({ open, onClose }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
+export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoading }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<PreviewCiclo | null>(null);
+  const [error, setError] = useState("");
 
-  function reset() {
-    setFile(null)
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setFile(f);
+    setPreview(null);
+    setError("");
+  }
+
+  async function handlePreview() {
+    if (!file) return;
+    setError("");
+    try {
+      const data = await onPreview(file);
+      setPreview(data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error al procesar");
+    }
+  }
+
+  function handleConfirmar() {
+    if (!file) return;
+    onConfirmar(file);
+    onClose();
   }
 
   function handleClose() {
-    reset()
-    onClose()
-  }
-
-  function selectFile(f: File) {
-    if (!f.name.match(/\.(xlsx|xls)$/i)) {
-      return
-    }
-    setFile(f)
+    setFile(null);
+    setPreview(null);
+    setError("");
+    onClose();
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Subir archivo Excel</DialogTitle>
+          <DialogTitle>Nuevo Ciclo de Envío</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div
-            onDragOver={(e) => {
-              e.preventDefault()
-              setIsDragOver(true)
-            }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setIsDragOver(false)
-              const f = e.dataTransfer.files[0]
-              if (f) selectFile(f)
-            }}
-            className={cn(
-              'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-              isDragOver ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-slate-400'
-            )}
-          >
-            <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
-            <p className="text-sm font-medium text-slate-700">Arrastra un archivo aquí</p>
-            <p className="text-xs text-slate-500 mt-1">o haz clic para seleccionar</p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={(e) => {
-                const f = e.currentTarget.files?.[0]
-                if (f) selectFile(f)
-              }}
-              className="hidden"
-            />
-          </div>
-          {file && <p className="text-sm text-slate-600">Archivo: {file.name}</p>}
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={handleClose}>
-              Cancelar
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Button variant="outline" className="w-full" onClick={() => inputRef.current?.click()}>
+            {file ? file.name : "Seleccionar Excel de deudores"}
+          </Button>
+
+          {file && !preview && (
+            <Button className="w-full" onClick={handlePreview} disabled={isLoading}>
+              {isLoading ? "Procesando..." : "Ver preview"}
             </Button>
-            <Button onClick={() => {}}>
-              Subir
-            </Button>
-          </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {preview && (
+            <div className="rounded border p-4 space-y-2 bg-gray-50">
+              <h3 className="font-semibold text-sm">Resumen del ciclo</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span className="text-gray-600">Para enviar:</span>
+                <span className="font-medium text-green-700">{preview.para_enviar}</span>
+                <span className="text-gray-600">Sin email:</span>
+                <span className="font-medium text-amber-600">{preview.sin_email}</span>
+                <span className="text-gray-600">Filtrados:</span>
+                <span className="font-medium text-gray-500">{preview.filtrados}</span>
+                <span className="text-gray-600">Total deudores:</span>
+                <span className="font-medium">{preview.total_deudores}</span>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setPreview(null)}>
+                  Volver
+                </Button>
+                <Button className="flex-1" onClick={handleConfirmar}>
+                  Confirmar envío
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
