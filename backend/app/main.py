@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging, RequestLoggingMiddleware
-from app.routers import auth
+from app.routers import auth, plantilla
 
 setup_logging()
 _logger = logging.getLogger("mails_nico")
@@ -63,6 +63,7 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(auth.router)
+app.include_router(plantilla.router)
 
 
 @app.get("/health")
