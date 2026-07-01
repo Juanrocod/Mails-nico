@@ -1,187 +1,123 @@
 import io
 from dataclasses import dataclass
-from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+
+import openpyxl
 
 
-EXPECTED_COLUMNS: dict[str, str] = {
-    "cliente_nombre": "Descripcion",
-    "cuenta_comitente": "Comitente",
-    "cuenta_cotapartista": "Cuotapartista",
-    "id_orden": "Orden",
-    "fecha": "Fecha",
-    "hora": "Hora",
-    "fecha_liquidacion": "FechaLiquidacion",
-    "operacion": "Operacion",
-    "instrumento": "Ticker",
-    "moneda": "Moneda",
-    "cantidad": "Cantidad",
-    "precio": "Precio",
-    "monto": "Monto",
-    "estado": "Estado",
-    "cantidad_operada": "CantidadOperada",
-    "precio_operado": "PrecioOperado",
-    "operador": "Operador",
-    "origen": "Origen",
-    "asesor": "Asesor",
-    "requiere_conformidad": "RequiereConformidad",
+class ExcelParseError(Exception):
+    pass
+
+
+@dataclass
+class DeudorRow:
+    clave_union: str
+    nombre: str
+    localidad: Optional[str]
+    monto: Decimal
+
+
+@dataclass
+class MaestroRow:
+    clave_union: str
+    nombre: str
+    email: Optional[str]
+    localidad: Optional[str]
+
+
+# Aliases aceptados por columna. Agregar alias cuando el cliente comparta el Excel real.
+DEUDOR_ALIASES: dict[str, list[str]] = {
+    "clave_union": ["nro cliente", "nro_cliente", "cliente", "id cliente", "codigo"],
+    "nombre": ["nombre", "detalle del nombre", "detalle", "razon social", "consorcio"],
+    "localidad": ["localidad", "provincia", "ciudad", "zona"],
+    "monto": ["monto", "deuda", "importe", "saldo", "monto adeudado"],
+}
+
+MAESTRO_ALIASES: dict[str, list[str]] = {
+    "clave_union": ["nro cliente", "nro_cliente", "cliente", "id cliente", "codigo"],
+    "nombre": ["nombre", "detalle del nombre", "detalle", "razon social", "consorcio"],
+    "email": ["email", "mail", "correo", "e-mail"],
+    "localidad": ["localidad", "provincia", "ciudad", "zona"],
 }
 
 
-@dataclass
-class OrdenParsed:
-    cliente_nombre: str
-    cuenta_comitente: str
-    cuenta_cotapartista: str
-    id_orden: int
-    fecha_operacion: datetime
-    fecha_liquidacion: str
-    operacion: str
-    instrumento: str
-    moneda: str
-    cantidad: float
-    precio: float
-    monto: float
-    estado: str
-    cantidad_operada: float
-    precio_operado: float
-    operador: str
-    origen: str
-    asesor: str
-    requiere_conformidad: int
+def _normalize(s: str) -> str:
+    return s.strip().lower()
 
 
-@dataclass
-class RowError:
-    fila: int
-    mensaje: str
+def _find_column(headers: list[str], field: str, aliases: dict[str, list[str]]) -> Optional[int]:
+    normalized = [_normalize(h) for h in headers]
+    for alias in aliases[field]:
+        if alias in normalized:
+            return normalized.index(alias)
+    return None
 
 
-@dataclass
-class ParseResult:
-    ordenes: list[OrdenParsed]
-    errors: list[RowError]
-
-
-def parse_excel_file(file_bytes: bytes) -> ParseResult:
-    import openpyxl
-
-    wb = openpyxl.load_workbook(filename=io.BytesIO(file_bytes), data_only=True)
+def _load_workbook(file_bytes: bytes) -> list[list]:
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    return rows
 
-    headers = [ws.cell(row=1, column=col).value for col in range(1, ws.max_column + 1)]
-    headers = [h.strip() if isinstance(h, str) else h for h in headers]
 
-    expected_headers = set(EXPECTED_COLUMNS.values())
-    present_headers = {h for h in headers if h is not None}
-    missing = expected_headers - present_headers
-    if missing:
-        raise ValueError(f"Columnas faltantes: {', '.join(sorted(missing))}")
+def parse_deudores(file_bytes: bytes) -> list[DeudorRow]:
+    rows = _load_workbook(file_bytes)
+    if not rows:
+        raise ExcelParseError("El archivo está vacío")
+    headers = [str(h) if h is not None else "" for h in rows[0]]
+    col = {}
+    for field in DEUDOR_ALIASES:
+        idx = _find_column(headers, field, DEUDOR_ALIASES)
+        if idx is None and field != "localidad":
+            raise ExcelParseError(f"Columna requerida no encontrada: {field}. Encabezados: {headers}")
+        col[field] = idx
 
-    header_to_col = {h: idx for idx, h in enumerate(headers)}
-    field_to_col = {
-        field: header_to_col[header]
-        for field, header in EXPECTED_COLUMNS.items()
-    }
-
-    ordenes: list[OrdenParsed] = []
-    errors: list[RowError] = []
-
-    for row_idx in range(2, ws.max_row + 1):
-        row_values = [ws.cell(row=row_idx, column=col).value for col in range(1, ws.max_column + 1)]
-
-        if all(v is None for v in row_values):
+    result = []
+    for row in rows[1:]:
+        clave = str(row[col["clave_union"]] or "").strip()
+        nombre = str(row[col["nombre"]] or "").strip()
+        monto_raw = row[col["monto"]]
+        if not clave or not nombre or monto_raw is None:
             continue
-
-        def get(field: str, _rv=row_values) -> object:
-            return _rv[field_to_col[field]]
-
         try:
-            orden = _parse_row(get)
-            ordenes.append(orden)
-        except ValueError as e:
-            errors.append(RowError(fila=row_idx, mensaje=str(e)))
+            monto = Decimal(str(monto_raw))
+        except Exception:
+            continue
+        if monto <= 0:
+            continue
+        localidad = None
+        if col["localidad"] is not None:
+            localidad = str(row[col["localidad"]] or "").strip() or None
+        result.append(DeudorRow(clave_union=clave, nombre=nombre, localidad=localidad, monto=monto))
+    return result
 
-    return ParseResult(ordenes=ordenes, errors=errors)
 
+def parse_maestro(file_bytes: bytes) -> list[MaestroRow]:
+    rows = _load_workbook(file_bytes)
+    if not rows:
+        raise ExcelParseError("El archivo está vacío")
+    headers = [str(h) if h is not None else "" for h in rows[0]]
+    col = {}
+    for field in MAESTRO_ALIASES:
+        idx = _find_column(headers, field, MAESTRO_ALIASES)
+        if idx is None and field not in ("localidad", "email"):
+            raise ExcelParseError(f"Columna requerida no encontrada: {field}. Encabezados: {headers}")
+        col[field] = idx
 
-def _parse_row(get) -> OrdenParsed:
-    cliente_nombre = str(get("cliente_nombre") or "").strip()
-    if not cliente_nombre:
-        raise ValueError("cliente_nombre es obligatorio")
-
-    cuenta_comitente = str(get("cuenta_comitente") or "").strip()
-    if not cuenta_comitente:
-        raise ValueError("cuenta_comitente es obligatoria")
-
-    cuenta_cotapartista = str(get("cuenta_cotapartista") or "").strip()
-
-    raw_id = get("id_orden")
-    try:
-        id_orden = int(raw_id)
-    except (TypeError, ValueError):
-        raise ValueError(f"id_orden inválido: '{raw_id}'")
-
-    raw_fecha = str(get("fecha") or "").strip()
-    raw_hora = str(get("hora") or "").strip()
-    try:
-        fecha_operacion = datetime.strptime(f"{raw_fecha} {raw_hora}", "%d/%m/%Y %H:%M:%S")
-    except ValueError:
-        raise ValueError(f"fecha/hora inválida: '{raw_fecha} {raw_hora}'")
-
-    fecha_liquidacion = str(get("fecha_liquidacion") or "").strip()
-
-    operacion = str(get("operacion") or "").strip()
-    if not operacion:
-        raise ValueError("operacion es obligatoria")
-
-    instrumento = str(get("instrumento") or "").strip()
-
-    moneda = str(get("moneda") or "").strip()
-    if not moneda:
-        raise ValueError("moneda es obligatoria")
-
-    def parse_float(field: str) -> float:
-        val = get(field)
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            raise ValueError(f"{field} debe ser un número, se recibió: '{val}'")
-
-    cantidad = parse_float("cantidad")
-    precio = parse_float("precio")
-    monto = parse_float("monto")
-    cantidad_operada = parse_float("cantidad_operada")
-    precio_operado = parse_float("precio_operado")
-
-    estado = str(get("estado") or "").strip()
-    operador = str(get("operador") or "").strip()
-    origen = str(get("origen") or "").strip()
-    asesor = str(get("asesor") or "").strip()
-
-    raw_rc = get("requiere_conformidad")
-    try:
-        requiere_conformidad = int(raw_rc) if raw_rc is not None else 0
-    except (TypeError, ValueError):
-        requiere_conformidad = 0
-
-    return OrdenParsed(
-        cliente_nombre=cliente_nombre,
-        cuenta_comitente=cuenta_comitente,
-        cuenta_cotapartista=cuenta_cotapartista,
-        id_orden=id_orden,
-        fecha_operacion=fecha_operacion,
-        fecha_liquidacion=fecha_liquidacion,
-        operacion=operacion,
-        instrumento=instrumento,
-        moneda=moneda,
-        cantidad=cantidad,
-        precio=precio,
-        monto=monto,
-        estado=estado,
-        cantidad_operada=cantidad_operada,
-        precio_operado=precio_operado,
-        operador=operador,
-        origen=origen,
-        asesor=asesor,
-        requiere_conformidad=requiere_conformidad,
-    )
+    result = []
+    for row in rows[1:]:
+        clave = str(row[col["clave_union"]] or "").strip()
+        nombre = str(row[col["nombre"]] or "").strip()
+        if not clave or not nombre:
+            continue
+        email = None
+        if col.get("email") is not None:
+            raw_email = str(row[col["email"]] or "").strip()
+            email = raw_email if raw_email else None
+        localidad = None
+        if col.get("localidad") is not None:
+            raw_loc = str(row[col["localidad"]] or "").strip()
+            localidad = raw_loc if raw_loc else None
+        result.append(MaestroRow(clave_union=clave, nombre=nombre, email=email, localidad=localidad))
+    return result
