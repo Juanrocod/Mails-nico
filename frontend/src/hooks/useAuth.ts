@@ -1,33 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import {
-  login,
-  verifyTotp,
-  logout as logoutApi,
-  setPendingToken,
-  getPendingToken,
-  clearPendingToken,
-} from '../services/auth'
-import { setTokens, clearTokens, getAccessToken } from '../services/api'
+import { login, logout as logoutApi } from '../services/auth'
+import { getAccessToken } from '../services/api'
 
 export function useAuth() {
   const navigate = useNavigate()
 
   async function handleLogin(username: string, password: string): Promise<void> {
-    const res = await login(username, password)
-    setPendingToken(res.pending_token)
-    navigate('/login/2fa')
-  }
-
-  async function handleVerify2fa(code: string): Promise<void> {
-    const token = getPendingToken()
-    if (!token) {
-      navigate('/login')
-      return
-    }
-    const res = await verifyTotp(token, code)
-    clearPendingToken()
-    setTokens(res.access_token, res.refresh_token)
-    navigate('/dashboard/borradores')
+    await login(username, password)
+    navigate('/seguimiento/no-contestados')
   }
 
   async function handleLogout(): Promise<void> {
@@ -36,7 +16,6 @@ export function useAuth() {
     } catch {
       // continuar aunque falle la red — siempre limpiar estado local
     } finally {
-      clearTokens()
       navigate('/login')
     }
   }
@@ -45,5 +24,5 @@ export function useAuth() {
     return getAccessToken() !== null
   }
 
-  return { handleLogin, handleVerify2fa, handleLogout, isAuthenticated }
+  return { handleLogin, handleLogout, isAuthenticated }
 }

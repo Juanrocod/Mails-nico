@@ -1,34 +1,25 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
-import TwoFactorPage from './pages/TwoFactorPage'
-import RegisterPage from './pages/RegisterPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import DashboardPage from './pages/DashboardPage'
-import FiltradaPage from './pages/FiltradaPage'
 import PlantillaPage from './pages/PlantillaPage'
-import ConfigDJPage from './pages/ConfigDJPage'
-import FiltrosMinutasPage from './pages/FiltrosMinutasPage'
-import AppLayout from './components/layout/AppLayout'
 import AuthGuard from './components/layout/AuthGuard'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/login/2fa" element={<TwoFactorPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AuthGuard />}>
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard/borradores" element={<DashboardPage estado="BORRADOR" />} />
-          <Route path="/dashboard/enviados" element={<DashboardPage estado="ENVIADO" />} />
-          <Route path="/dashboard/filtradas" element={<FiltradaPage />} />
-          <Route path="/dashboard/plantilla" element={<PlantillaPage />} />
-          <Route path="/dashboard/config-dj" element={<ConfigDJPage />} />
-          <Route path="/dashboard/filtros-minutas" element={<FiltrosMinutasPage />} />
-        </Route>
+        <Route path="/seguimiento/no-contestados" element={<div>Seguimiento - No Contestados</div>} />
+        <Route path="/seguimiento/contestados" element={<div>Seguimiento - Contestados</div>} />
+        <Route path="/seguimiento/pagos" element={<div>Seguimiento - Pagos</div>} />
+        <Route path="/seguimiento/rebotados" element={<div>Seguimiento - Rebotados</div>} />
+        <Route path="/nuevo-envio/para-enviar" element={<div>Nuevo Envío - Para Enviar</div>} />
+        <Route path="/nuevo-envio/sin-email" element={<div>Nuevo Envío - Sin Email</div>} />
+        <Route path="/nuevo-envio/filtrados" element={<div>Nuevo Envío - Filtrados</div>} />
+        <Route path="/maestro" element={<div>Maestro de Clientes</div>} />
+        <Route path="/plantilla" element={<PlantillaPage />} />
+        <Route path="/configuracion" element={<div>Configuración</div>} />
       </Route>
-      <Route path="/" element={<Navigate to="/dashboard/borradores" replace />} />
+      <Route path="/" element={<Navigate to="/seguimiento/no-contestados" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

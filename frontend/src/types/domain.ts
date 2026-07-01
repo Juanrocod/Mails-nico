@@ -1,108 +1,52 @@
-export type EstadoMinuta = "BORRADOR" | "ENVIADO" | "FILTRADA";
+export type EstadoEnvio =
+  | "NO_CONTESTADO"
+  | "CONTESTADO"
+  | "PAGO"
+  | "REBOTADO"
+  | "SIN_EMAIL"
+  | "FILTRADO";
 
-export interface Minuta {
+export type MotivoFiltrado = "MONTO_MINIMO" | "DADO_DE_BAJA";
+
+export interface Envio {
   id: string;
-  // Campos del Excel
-  cliente_nombre: string;
-  cuenta_comitente: string;
-  cuenta_cotapartista: string;
-  id_orden: number;
-  fecha_operacion: string; // ISO datetime string
-  fecha_liquidacion: string;
-  operacion: string;
-  instrumento: string;
-  moneda: string;
-  cantidad: number;       // -1 = N/A
-  precio: number;         // -1 = N/A
+  ciclo_id: string;
+  ciclo_numero: number;
+  clave_union: string;
+  nombre_consorcio: string;
+  email: string | null;
   monto: number;
-  estado_orden: string;
-  cantidad_operada: number; // -1 = N/A
-  precio_operado: number;   // -1 = N/A
-  operador: string;
-  origen: string;
-  asesor: string;
-  requiere_conformidad: number; // 0 | 1
-  // Campos de sesión
-  dj_aplicada: boolean;
-  dj_texto: string | null;
-  estado: EstadoMinuta;
-  filtro_motivo: string | null;
-  texto_minuta: string;
-  texto_editado: boolean;
-  creado_en: string; // ISO datetime string
+  estado: EstadoEnvio;
+  motivo_filtrado: MotivoFiltrado | null;
+  message_id: string | null;
+  reply_snippet: string | null;
+  enviado_en: string | null;
+  actualizado_en: string;
 }
 
-export interface RowError {
-  fila: number;
-  mensaje: string;
+export interface PreviewCiclo {
+  para_enviar: number;
+  sin_email: number;
+  filtrados: number;
+  total_deudores: number;
+  monto_total_enviar: number;
 }
 
-export interface UploadMVPResponse {
-  ordenes_validas: number;
-  ordenes_con_error: number;
-  ordenes_filtradas: number;
-  errors: RowError[];
-  minutas: Minuta[];
-}
-
-export type CampoRegla =
-  | "operacion"
-  | "operador"
-  | "origen"
-  | "estado"
-  | "moneda"
-  | "instrumento"
-  | "cantidad"
-  | "precio"
-  | "monto"
-  | "cantidad_operada"
-  | "precio_operado"
-  | "requiere_conformidad";
-
-export type OperadorRegla = "=" | "!=" | ">" | "<" | ">=" | "<=";
-
-export interface ReglaConfig {
-  campo: CampoRegla;
-  operador: OperadorRegla;
-  valor: string;
-}
-
-export interface ConfigDJ {
-  id?: number;
+export interface ClienteMaestro {
+  id: string;
+  clave_union: string;
   nombre: string;
-  activa: boolean;
-  incluir_texto_en_minuta: boolean;
-  texto_alerta: string;
-  reglas: ReglaConfig[];
-  logica: "AND" | "OR";
-  activar_si_requiere_conformidad: boolean;
-}
-
-export interface ConfigFiltros {
-  reglas: ReglaConfig[];
-  logica: "AND" | "OR";
-}
-
-export interface SessionMinutasResponse {
-  items: Minuta[];
-  total: number;
-}
-
-export interface PlantillaResponse {
-  texto: string;
+  email: string | null;
+  localidad: string | null;
+  prefiere_no_recibir_email: boolean;
+  activo: boolean;
 }
 
 export interface Plantilla {
-  texto: string;
-}
-
-export interface LoginResponse {
-  pending_token: string;
-  message: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
+  asunto: string;
+  cuerpo_html: string;
+  nombre_empresa: string;
+  logo_url: string | null;
+  color_primario: string;
+  monto_minimo: number;
 }

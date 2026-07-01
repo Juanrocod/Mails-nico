@@ -34,8 +34,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-semibold text-slate-900">Gestión de Minutas</h1>
-          <p className="text-sm text-slate-500">Ingresá con tus credenciales</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Mails-nico</h1>
+          <p className="text-sm text-slate-500">Sistema de Cobro Automático</p>
         </div>
 
         <form

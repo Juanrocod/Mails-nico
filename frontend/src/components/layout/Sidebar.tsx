@@ -1,26 +1,9 @@
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { FileText, Send, Filter, FileEdit, Settings2, Sliders, Upload, LogOut, KeyRound, ShieldCheck } from 'lucide-react'
-import { Badge } from '../ui/badge'
+import { LogOut, KeyRound } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
 import { cn } from '../../lib/utils'
-import { fetchMinutas } from '../../services/minutas'
 import { useAuth } from '../../hooks/useAuth'
-import ExcelUploadModal from '../upload/ExcelUploadModal'
-import ChangePasswordModal from '../profile/ChangePasswordModal'
-import RegenerateTOTPModal from '../profile/RegenerateTOTPModal'
-import type { EstadoMinuta } from '../../types/domain'
-
-function useBadgeCount(estado: EstadoMinuta): number {
-  const { data } = useQuery({
-    queryKey: ['minutas', estado],
-    queryFn: () => fetchMinutas(estado),
-    staleTime: 30_000,
-  })
-  return data?.total ?? 0
-}
 
 function NavItem({
   to,
@@ -49,10 +32,10 @@ function NavItem({
         <Icon className="h-4 w-4 shrink-0" />
         {label}
       </span>
-      {count != null && count > 0 && (
-        <Badge variant="secondary" className="text-xs tabular-nums">
+      {count !== undefined && count > 0 && (
+        <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
           {count}
-        </Badge>
+        </span>
       )}
     </NavLink>
   )
@@ -60,83 +43,59 @@ function NavItem({
 
 export default function Sidebar() {
   const { handleLogout } = useAuth()
-  const [uploadOpen, setUploadOpen] = useState(false)
-  const [changePassOpen, setChangePassOpen] = useState(false)
-  const [regenTOTPOpen, setRegenTOTPOpen] = useState(false)
-  const borradores = useBadgeCount('BORRADOR')
-  const enviados = useBadgeCount('ENVIADO')
 
   return (
-    <>
-      <aside className="w-60 h-screen flex flex-col bg-white border-r border-slate-200 shrink-0">
-        <div className="px-4 py-5 border-b border-slate-100">
-          <p className="text-sm font-semibold text-slate-900">Gestión de Minutas</p>
-          <p className="text-xs text-slate-400 mt-0.5">Sistema bursátil CNV</p>
+    <aside className="w-64 border-r border-slate-200 bg-white flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-3">
+            Seguimiento
+          </h2>
+          <nav className="space-y-1">
+            <NavItem to="/seguimiento/no-contestados" label="No contestados" icon={() => null} />
+            <NavItem to="/seguimiento/contestados" label="Contestados" icon={() => null} />
+            <NavItem to="/seguimiento/pagos" label="Pagos" icon={() => null} />
+            <NavItem to="/seguimiento/rebotados" label="Rebotados" icon={() => null} />
+          </nav>
         </div>
 
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          <NavItem to="/dashboard/borradores" label="Borradores" icon={FileText} count={borradores} />
-          <NavItem to="/dashboard/enviados" label="Enviados" icon={Send} count={enviados} />
-          <NavItem to="/dashboard/filtradas" label="Filtradas" icon={Filter} />
-          <Separator className="my-2" />
-          <NavItem to="/dashboard/plantilla" label="Plantilla Estándar" icon={FileEdit} />
-          <NavItem to="/dashboard/config-dj" label="Config DJ" icon={Settings2} />
-          <NavItem to="/dashboard/filtros-minutas" label="Filtros de Minutas" icon={Sliders} />
-        </nav>
+        <Separator />
 
-        <div className="p-3 border-t border-slate-100 space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2"
-            onClick={() => setUploadOpen(true)}
-          >
-            <Upload className="h-3.5 w-3.5" />
-            Subir Excel
-          </Button>
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600">
-                MO
-              </div>
-              <span className="text-xs text-slate-600">Middle Office</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setChangePassOpen(true)}
-                title="Cambiar contraseña"
-              >
-                <KeyRound className="h-3.5 w-3.5 text-slate-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setRegenTOTPOpen(true)}
-                title="Regenerar Authenticator"
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={handleLogout}
-                title="Cerrar sesión"
-              >
-                <LogOut className="h-3.5 w-3.5 text-slate-400" />
-              </Button>
-            </div>
-          </div>
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-3">
+            Gestión
+          </h2>
+          <nav className="space-y-1">
+            <NavItem to="/nuevo-envio/para-enviar" label="Nuevo Envío" icon={() => null} />
+            <NavItem to="/maestro" label="Maestro de Clientes" icon={() => null} />
+            <NavItem to="/plantilla" label="Plantilla" icon={() => null} />
+            <NavItem to="/configuracion" label="Configuración" icon={() => null} />
+          </nav>
         </div>
-      </aside>
+      </div>
 
-      <ExcelUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
-      <ChangePasswordModal open={changePassOpen} onClose={() => setChangePassOpen(false)} />
-      <RegenerateTOTPModal open={regenTOTPOpen} onClose={() => setRegenTOTPOpen(false)} />
-    </>
+      <Separator />
+
+      <div className="p-4 space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-slate-600 hover:text-slate-900"
+          onClick={() => {}}
+        >
+          <KeyRound className="h-4 w-4 mr-2" />
+          Cambiar contraseña
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-red-600 hover:text-red-900"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Salir
+        </Button>
+      </div>
+    </aside>
   )
 }

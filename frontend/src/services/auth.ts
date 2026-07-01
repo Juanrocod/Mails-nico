@@ -1,64 +1,38 @@
-import { api } from './api'
-import type { LoginResponse, TokenResponse } from '../types/domain'
+import { apiFetch } from "./api";
 
-let pendingToken: string | null = null
-
-export function setPendingToken(token: string): void {
-  pendingToken = token
-}
-
-export function getPendingToken(): string | null {
-  return pendingToken
-}
-
-export function clearPendingToken(): void {
-  pendingToken = null
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const res = await api.post<LoginResponse>('/auth/login', { username, password })
-  return res.data
-}
-
-export async function verifyTotp(pending_token: string, code: string): Promise<TokenResponse> {
-  const res = await api.post<TokenResponse>('/auth/verify-totp', { pending_token, code })
-  return res.data
+  const r = await apiFetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!r.ok) throw new Error("Credenciales inválidas");
+  const data = await r.json();
+  localStorage.setItem("access_token", data.access_token);
+  localStorage.setItem("refresh_token", data.refresh_token);
+  return data;
 }
 
 export async function logout(): Promise<void> {
-  await api.post('/auth/logout')
+  await apiFetch("/auth/logout", { method: "POST" });
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
-export async function register(
-  token: string,
-  username: string,
-  password: string
-): Promise<{ totp_uri: string; setup_token: string }> {
-  const res = await api.post('/auth/register', { token, username, password })
-  return res.data
-}
-
-export async function confirmRegister(
-  setup_token: string,
-  totp_code: string
-): Promise<void> {
-  await api.post('/auth/register/confirm', { setup_token, totp_code })
-}
-
-export async function resetPassword(token: string, password: string): Promise<void> {
-  await api.post('/auth/reset-password', { token, password })
-}
-
-export async function changePassword(
-  old_password: string,
-  new_password: string
-): Promise<void> {
-  await api.post('/auth/change-password', { old_password, new_password })
-}
-
-export async function regenerateTotp(
-  totp_code: string
-): Promise<{ totp_uri: string }> {
-  const res = await api.post('/auth/regenerate-totp', { totp_code })
-  return res.data
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const r = await apiFetch("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Error al cambiar contraseña");
+  }
 }
