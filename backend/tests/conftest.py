@@ -89,14 +89,17 @@ def auth_headers(client, test_user):
 
 @pytest.fixture
 def plantilla_default(db):
-    p = Plantilla(
+    from datetime import datetime, timezone
+    # Use db.merge() so the fixture is safe whether or not Plantilla(id=1) already
+    # exists in the database (e.g. committed by test_plantilla.py in a prior test run).
+    p = db.merge(Plantilla(
         id=1,
         asunto="Recordatorio de deuda",
         cuerpo_html="<p>Estimado {{nombre}}, su deuda es ${{monto}}.</p>",
         nombre_empresa="Ascensores SA",
         color_primario="#1a56db",
         monto_minimo=0,
-    )
-    db.add(p)
+        actualizado_en=datetime.now(timezone.utc),
+    ))
     db.flush()
     return p
