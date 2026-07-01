@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging, RequestLoggingMiddleware
-from app.routers import auth, plantilla, maestro
+from app.routers import auth, plantilla, maestro, ciclos
 from app.services import imap_watcher
 
 setup_logging()
@@ -66,6 +66,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(auth.router)
 app.include_router(plantilla.router)
 app.include_router(maestro.router)
+app.include_router(ciclos.router)
 
 
 @app.on_event("startup")

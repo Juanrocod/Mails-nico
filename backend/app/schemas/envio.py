@@ -1,0 +1,30 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
+from app.models.envio import EstadoEnvio, MotivoFiltrado
+
+
+class EnvioSchema(BaseModel):
+    id: UUID
+    ciclo_id: UUID
+    ciclo_numero: int
+    clave_union: str
+    nombre_consorcio: str
+    email: Optional[str]
+    monto: Decimal
+    estado: EstadoEnvio
+    motivo_filtrado: Optional[MotivoFiltrado]
+    message_id: Optional[str]
+    reply_snippet: Optional[str]
+    enviado_en: Optional[datetime]
+    actualizado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EstadoUpdateRequest(BaseModel):
+    estado: EstadoEnvio
