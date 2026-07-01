@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from decimal import Decimal
 from app.services.smtp_sender import enviar_ciclo
 from app.models.envio import Envio, EstadoEnvio
@@ -62,10 +62,12 @@ def test_enviar_ciclo_respeta_rate_limit(db, plantilla_default):
     async def on_progress(e):
         calls.append(e.id)
 
-    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+    with patch("app.services.smtp_sender._send_single_email") as mock_send, \
+         patch("app.services.smtp_sender.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         mock_send.return_value = "<mid@yahoo.com>"
         asyncio.get_event_loop().run_until_complete(
             enviar_ciclo(envios, db, on_progress, rate_limit_override=(2, 0.05))
         )
 
     assert len(calls) == 4
+    mock_sleep.assert_called_once()

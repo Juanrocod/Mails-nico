@@ -21,23 +21,6 @@ setup_logging()
 _logger = logging.getLogger("mails_nico")
 
 
-def _run_migrations():
-    try:
-        from alembic.config import Config
-        from alembic import command
-        import os
-        alembic_ini = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
-        if os.path.exists(alembic_ini):
-            alembic_cfg = Config(alembic_ini)
-            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-            command.upgrade(alembic_cfg, "head")
-            _logger.info("Migraciones aplicadas correctamente")
-    except Exception as e:
-        _logger.error("Error al aplicar migraciones: %s", e)
-
-
-_run_migrations()
-
 app = FastAPI(title="Sistema de Cobro por Mail", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -69,6 +52,7 @@ app.include_router(maestro.router)
 app.include_router(ciclos.router)
 
 
+# Run migrations manually before starting: alembic upgrade head
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(imap_watcher.run_forever())
