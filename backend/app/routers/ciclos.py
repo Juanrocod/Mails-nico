@@ -150,7 +150,7 @@ async def _stream_envios(envios_db: list[Envio], db: Session):
     await send_task
 
 
-@router.post("/ciclos/desde-api", status_code=501)
+@router.post("/ciclos/desde-api")
 def desde_api(current_user: User = Depends(get_current_user)):
     raise HTTPException(status_code=501, detail="No implementado — Fase 3")
 
