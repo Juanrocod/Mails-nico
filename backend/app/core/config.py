@@ -4,15 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
-    # Legacy field — kept optional for backwards-compat while auth is being cleaned up (Task 3)
-    ENCRYPTION_KEY: str = ""
-    TOTP_ISSUER: str = "GestionMails"
+    YAHOO_EMAIL: str
+    YAHOO_APP_PASSWORD: str
     ACCESS_TOKEN_EXPIRE_HOURS: int = 8
     REFRESH_TOKEN_EXPIRE_HOURS: int = 8
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000"
-    # Yahoo Mail credentials
-    YAHOO_EMAIL: str = ""
-    YAHOO_APP_PASSWORD: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     def get_allowed_origins(self) -> list[str]:
