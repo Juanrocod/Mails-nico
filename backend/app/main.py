@@ -1,4 +1,6 @@
-import fastapi
+import asyncio
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -12,13 +14,11 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging, RequestLoggingMiddleware
-from app.routers import auth, uploads
-from app.routers import session as session_router
+from app.routers import auth
 
 setup_logging()
+_logger = logging.getLogger("mails_nico")
 
-import logging
-_logger = logging.getLogger("gestion_mails")
 
 def _run_migrations():
     try:
@@ -34,9 +34,10 @@ def _run_migrations():
     except Exception as e:
         _logger.error("Error al aplicar migraciones: %s", e)
 
+
 _run_migrations()
 
-app = FastAPI(title="Gestión de Órdenes Bursátiles — MVP", version="2.0.0")
+app = FastAPI(title="Sistema de Cobro por Mail", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -62,8 +63,6 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(auth.router)
-app.include_router(uploads.router)
-app.include_router(session_router.router)
 
 
 @app.get("/health")
@@ -75,23 +74,3 @@ def health():
         return {"status": "ok", "database": "ok"}
     except Exception:
         return {"status": "degraded", "database": "error"}
-
-
-@app.post("/admin/create-invite")
-def create_invite(x_admin_key: str = fastapi.Header(...)):
-    import hmac
-    if not hmac.compare_digest(x_admin_key, settings.SECRET_KEY):
-        raise fastapi.HTTPException(status_code=403, detail="Forbidden")
-    import secrets
-    from datetime import datetime, timedelta, timezone
-    from app.models.invite_token import InviteToken
-    db = SessionLocal()
-    token_value = secrets.token_urlsafe(32)
-    db.add(InviteToken(
-        token=token_value,
-        tipo="invite",
-        expira_en=datetime.now(timezone.utc) + timedelta(hours=48),
-    ))
-    db.commit()
-    db.close()
-    return {"token": token_value}
