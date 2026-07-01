@@ -1,27 +1,27 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import AppLayout from './components/layout/AppLayout'
+import AuthGuard from './components/layout/AuthGuard'
 import LoginPage from './pages/LoginPage'
-import PlantillaPage from './pages/PlantillaPage'
 import NuevoEnvioPage from './pages/NuevoEnvioPage'
 import SeguimientoPage from './pages/SeguimientoPage'
-import AuthGuard from './components/layout/AuthGuard'
+import MaestroPage from './pages/MaestroPage'
+import PlantillaPage from './pages/PlantillaPage'
+import ConfiguracionPage from './pages/ConfiguracionPage'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<AuthGuard />}>
-        <Route path="/seguimiento/no-contestados" element={<SeguimientoPage />} />
-        <Route path="/seguimiento/contestados" element={<SeguimientoPage />} />
-        <Route path="/seguimiento/pagos" element={<SeguimientoPage />} />
-        <Route path="/seguimiento/rebotados" element={<SeguimientoPage />} />
-        <Route path="/nuevo-envio/para-enviar" element={<NuevoEnvioPage />} />
-        <Route path="/nuevo-envio/sin-email" element={<NuevoEnvioPage />} />
-        <Route path="/nuevo-envio/filtrados" element={<NuevoEnvioPage />} />
-        <Route path="/maestro" element={<div>Maestro de Clientes</div>} />
-        <Route path="/plantilla" element={<PlantillaPage />} />
-        <Route path="/configuracion" element={<div>Configuración</div>} />
+        <Route element={<AppLayout />}>
+          <Route path="/nuevo-envio/*" element={<NuevoEnvioPage />} />
+          <Route path="/seguimiento/*" element={<SeguimientoPage />} />
+          <Route path="/maestro" element={<MaestroPage />} />
+          <Route path="/plantilla" element={<PlantillaPage />} />
+          <Route path="/configuracion" element={<ConfiguracionPage />} />
+          <Route path="/" element={<Navigate to="/seguimiento/no-contestados" replace />} />
+        </Route>
       </Route>
-      <Route path="/" element={<Navigate to="/seguimiento/no-contestados" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

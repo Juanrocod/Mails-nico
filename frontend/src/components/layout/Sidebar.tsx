@@ -92,7 +92,7 @@ export default function Sidebar() {
           variant="ghost"
           size="sm"
           className="w-full justify-start text-slate-600 hover:text-slate-900"
-          onClick={() => {}}
+          onClick={() => navigate('/configuracion')}
         >
           <KeyRound className="h-4 w-4 mr-2" />
           Cambiar contraseña
