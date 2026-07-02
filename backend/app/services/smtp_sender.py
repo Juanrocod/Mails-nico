@@ -8,7 +8,7 @@ from typing import Awaitable, Callable, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.services import config_service
 from app.models.envio import Envio
 from app.services import db_config
 from app.services.email_generator import generate_email
@@ -36,8 +36,7 @@ async def enviar_ciclo(
 ) -> None:
     plantilla = db_config.load_plantilla(db)
     batch_size, batch_wait = rate_limit_override or _DEFAULT_RATE_LIMIT
-    from_email = settings.YAHOO_EMAIL
-    app_password = settings.YAHOO_APP_PASSWORD
+    from_email, app_password = config_service.get_yahoo_credentials(db)
 
     sent_in_batch = 0
     loop = asyncio.get_running_loop()

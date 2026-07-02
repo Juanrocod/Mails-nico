@@ -4,9 +4,9 @@ import imaplib
 import logging
 from datetime import datetime, timedelta, timezone
 
-from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.envio import Envio, EstadoEnvio
+from app.services import config_service
 from app.services.reply_classifier import classify
 
 _logger = logging.getLogger("mails_nico.imap")
@@ -49,9 +49,10 @@ def _poll_inbox():
 
         message_id_map = {e.message_id: e for e in active_envios}
 
+        yahoo_email, yahoo_app_password = config_service.get_yahoo_credentials(db)
         mail = imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
         try:
-            mail.login(settings.YAHOO_EMAIL, settings.YAHOO_APP_PASSWORD)
+            mail.login(yahoo_email, yahoo_app_password)
             mail.select("INBOX")
 
             since_date = cutoff.strftime("%d-%b-%Y")
