@@ -19,6 +19,7 @@ from app.models.plantilla import Plantilla
 from app.models.cliente_maestro import ClienteMaestro
 from app.models.ciclo import Ciclo
 from app.models.envio import Envio
+from app.models.configuracion_sistema import ConfiguracionSistema
 
 _engine = create_engine(
     "sqlite:///:memory:",
