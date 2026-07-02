@@ -5,6 +5,7 @@ os.environ.setdefault("SECRET_KEY", "test_secret_key_minimum_32_characters_here_
 os.environ.setdefault("RATELIMIT_ENABLED", "false")
 os.environ.setdefault("YAHOO_EMAIL", "test@yahoo.com")
 os.environ.setdefault("YAHOO_APP_PASSWORD", "testapppassword")
+os.environ.setdefault("ENCRYPTION_KEY", "d7YW8J0w_22uQFcAoYlsBiERC-gzOFsBMyhs-Qs2xfU=")
 
 import pytest
 from sqlalchemy import create_engine, event
@@ -56,6 +57,9 @@ def db(setup_test_database):
     try:
         yield session
         session.rollback()
+        # Clear ConfiguracionSistema for test isolation
+        session.query(ConfiguracionSistema).delete()
+        session.commit()
     finally:
         session.close()
 

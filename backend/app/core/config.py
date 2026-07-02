@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
+    ENCRYPTION_KEY: str
     YAHOO_EMAIL: str
     YAHOO_APP_PASSWORD: str
     ACCESS_TOKEN_EXPIRE_HOURS: int = 8
