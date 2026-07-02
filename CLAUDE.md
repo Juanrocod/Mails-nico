@@ -12,7 +12,8 @@ Sistema web para automatizar el envío de recordatorios de deuda a consorcios cl
 
 **Lee `CONTEXT.md` para el glosario del dominio antes de escribir cualquier código.**  
 **Lee `docs/superpowers/specs/2026-06-30-mails-nico-design.md` para el spec completo.**  
-**Lee `docs/adr/` antes de tomar decisiones arquitectónicas.**
+**Lee `docs/adr/` antes de tomar decisiones arquitectónicas.**  
+**Lee `docs/PENDIENTES.md` para ver los gaps de implementación conocidos vs. el spec.**
 
 ---
 

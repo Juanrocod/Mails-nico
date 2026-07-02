@@ -5,6 +5,7 @@ import type { Envio, PreviewCiclo } from "../types/domain";
 export function useCiclo() {
   const [enviosActivo, setEnviosActivo] = useState<Envio[]>([]);
   const [previewData, setPreviewData] = useState<PreviewCiclo | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progreso, setProgreso] = useState<{ enviado: number; total: number } | null>(null);
 
@@ -18,10 +19,16 @@ export function useCiclo() {
     try {
       const data = await previewCiclo(file);
       setPreviewData(data);
+      setPreviewFile(file);
       return data;
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const clearPreview = useCallback(() => {
+    setPreviewData(null);
+    setPreviewFile(null);
   }, []);
 
   const confirmar = useCallback(
@@ -42,5 +49,26 @@ export function useCiclo() {
     [loadEnviosActivo],
   );
 
-  return { enviosActivo, previewData, preview, confirmar, isLoading, progreso, loadEnviosActivo };
+  const confirmarPreview = useCallback(
+    (onDone?: () => void) => {
+      if (!previewFile) return;
+      const file = previewFile;
+      clearPreview();
+      confirmar(file, onDone);
+    },
+    [previewFile, clearPreview, confirmar],
+  );
+
+  return {
+    enviosActivo,
+    previewData,
+    previewFile,
+    preview,
+    clearPreview,
+    confirmar,
+    confirmarPreview,
+    isLoading,
+    progreso,
+    loadEnviosActivo,
+  };
 }

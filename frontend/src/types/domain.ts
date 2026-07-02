@@ -24,12 +24,24 @@ export interface Envio {
   actualizado_en: string;
 }
 
+export interface PreviewItem {
+  clave_union: string;
+  nombre_consorcio: string;
+  email: string | null;
+  monto: number;
+  localidad: string | null;
+  motivo_filtrado: MotivoFiltrado | null;
+}
+
 export interface PreviewCiclo {
   para_enviar: number;
   sin_email: number;
   filtrados: number;
   total_deudores: number;
   monto_total_enviar: number;
+  items_para_enviar: PreviewItem[];
+  items_sin_email: PreviewItem[];
+  items_filtrados: PreviewItem[];
 }
 
 export interface ClienteMaestro {

@@ -1,11 +1,9 @@
+import type React from "react";
 import type { Envio } from "../../types/domain";
-
-const ESTADO_BADGE: Record<string, string> = {
-  NO_CONTESTADO: "bg-yellow-100 text-yellow-800",
-  CONTESTADO: "bg-blue-100 text-blue-800",
-  PAGO: "bg-green-100 text-green-800",
-  REBOTADO: "bg-red-100 text-red-800",
-};
+import { cn } from "../../lib/utils";
+import { Badge } from "../ui/badge";
+import { Card } from "../ui/card";
+import { ESTADO_BADGE, ESTADO_LABEL } from "../../lib/estado";
 
 interface Props {
   envio: Envio;
@@ -14,25 +12,44 @@ interface Props {
 
 export function EnvioCard({ envio, onClick }: Props) {
   return (
-    <div
-      className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+    <Card
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="p-4 cursor-pointer hover:shadow-md transition-all select-none"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-medium">{envio.nombre_consorcio}</p>
-          <p className="text-sm text-gray-500">{envio.email ?? "Sin email"}</p>
-        </div>
-        <div className="text-right">
-          <p className="font-semibold">${Number(envio.monto).toLocaleString("es-AR")}</p>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${ESTADO_BADGE[envio.estado] ?? ""}`}>
-            {envio.estado.replace("_", " ")}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <span className="font-medium text-sm text-foreground truncate block">
+            {envio.nombre_consorcio}
           </span>
+          <p className="text-sm text-muted-foreground">
+            ${Number(envio.monto).toLocaleString("es-AR")}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span>{envio.email ?? "Sin email"}</span>
+            {envio.reply_snippet && (
+              <>
+                <span>·</span>
+                <span className="truncate">{envio.reply_snippet}</span>
+              </>
+            )}
+          </div>
         </div>
+
+        <Badge
+          variant="outline"
+          className={cn("text-xs shrink-0 self-start border-transparent", ESTADO_BADGE[envio.estado])}
+        >
+          {ESTADO_LABEL[envio.estado]}
+        </Badge>
       </div>
-      {envio.reply_snippet && (
-        <p className="text-xs text-gray-400 mt-2 line-clamp-1">{envio.reply_snippet}</p>
-      )}
-    </div>
+    </Card>
   );
 }

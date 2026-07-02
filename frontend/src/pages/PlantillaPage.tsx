@@ -61,62 +61,83 @@ export default function PlantillaPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">Plantilla de Mail</h1>
-      <div className="space-y-3">
-        <label className="block text-sm font-medium">Asunto</label>
-        <Input value={form.asunto} onChange={(e) => set("asunto", e.target.value)} />
-
-        <label className="block text-sm font-medium">Cuerpo HTML</label>
-        <div className="flex flex-wrap gap-1.5">
-          {VARIABLES.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertarVariable(v)}
-              className="px-2 py-1 text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200 transition-colors"
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <Textarea
-          ref={textareaRef}
-          rows={8}
-          value={form.cuerpo_html}
-          onChange={(e) => set("cuerpo_html", e.target.value)}
-          className="font-mono text-sm"
-        />
-
-        <label className="block text-sm font-medium">Nombre empresa</label>
-        <Input
-          value={form.nombre_empresa}
-          onChange={(e) => set("nombre_empresa", e.target.value)}
-        />
-
-        <label className="block text-sm font-medium">Color primario (hex)</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={form.color_primario}
-            onChange={(e) => set("color_primario", e.target.value)}
-          />
-          <Input
-            value={form.color_primario}
-            onChange={(e) => set("color_primario", e.target.value)}
-            className="w-32"
-          />
-        </div>
-
-        <label className="block text-sm font-medium">Monto mínimo de envío ($)</label>
-        <Input
-          type="number"
-          value={form.monto_minimo}
-          onChange={(e) => set("monto_minimo", Number(e.target.value))}
-        />
+    <div className="max-w-3xl mx-auto space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Plantilla de Mail</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Asunto, cuerpo y monto mínimo de envío del recordatorio de cobro.
+        </p>
       </div>
-      {status && <p className="text-sm text-gray-600">{status}</p>}
-      <Button onClick={handleSave}>Guardar plantilla</Button>
+
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Asunto</label>
+          <Input value={form.asunto} onChange={(e) => set("asunto", e.target.value)} />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Cuerpo HTML</label>
+          <div className="flex flex-wrap gap-1.5">
+            {VARIABLES.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => insertarVariable(v)}
+                className="px-2 py-1 text-xs font-mono bg-secondary hover:bg-secondary/70 text-secondary-foreground rounded border border-border transition-colors"
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <Textarea
+            ref={textareaRef}
+            rows={8}
+            value={form.cuerpo_html}
+            onChange={(e) => set("cuerpo_html", e.target.value)}
+            className="font-mono text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Nombre empresa</label>
+          <Input
+            value={form.nombre_empresa}
+            onChange={(e) => set("nombre_empresa", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Color primario (hex)</label>
+          <div className="flex gap-2 items-center">
+            <input
+              type="color"
+              value={form.color_primario}
+              onChange={(e) => set("color_primario", e.target.value)}
+              className="h-9 w-9 rounded border border-border"
+            />
+            <Input
+              value={form.color_primario}
+              onChange={(e) => set("color_primario", e.target.value)}
+              className="w-32"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">
+            Monto mínimo de envío ($)
+          </label>
+          <Input
+            type="number"
+            value={form.monto_minimo}
+            onChange={(e) => set("monto_minimo", Number(e.target.value))}
+            className="w-40"
+          />
+        </div>
+
+        {status && <p className="text-sm text-muted-foreground">{status}</p>}
+        <Button onClick={handleSave}>Guardar plantilla</Button>
+      </div>
     </div>
   );
 }

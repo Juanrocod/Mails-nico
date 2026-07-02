@@ -21,24 +21,32 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div className="p-6 max-w-sm space-y-4">
-      <h1 className="text-2xl font-bold">Configuración</h1>
-      <div className="space-y-3">
-        <label className="block text-sm font-medium">Contraseña actual</label>
-        <Input
-          type="password"
-          value={oldPass}
-          onChange={(e) => setOldPass(e.target.value)}
-        />
-        <label className="block text-sm font-medium">Nueva contraseña</label>
-        <Input
-          type="password"
-          value={newPass}
-          onChange={(e) => setNewPass(e.target.value)}
-        />
+    <div className="max-w-3xl mx-auto space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Configuración</h1>
+        <p className="text-sm text-muted-foreground mt-1">Cambiar la contraseña de acceso.</p>
       </div>
-      {status && <p className="text-sm text-gray-600">{status}</p>}
-      <Button onClick={handleChange}>Cambiar contraseña</Button>
+
+      <div className="max-w-sm space-y-4">
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Contraseña actual</label>
+          <Input
+            type="password"
+            value={oldPass}
+            onChange={(e) => setOldPass(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Nueva contraseña</label>
+          <Input
+            type="password"
+            value={newPass}
+            onChange={(e) => setNewPass(e.target.value)}
+          />
+        </div>
+        {status && <p className="text-sm text-muted-foreground">{status}</p>}
+        <Button onClick={handleChange}>Cambiar contraseña</Button>
+      </div>
     </div>
   );
 }

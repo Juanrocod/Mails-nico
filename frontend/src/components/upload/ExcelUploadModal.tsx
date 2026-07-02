@@ -1,24 +1,28 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { FileDropzone } from "./FileDropzone";
 import type { PreviewCiclo } from "../../types/domain";
+import { cn } from "../../lib/utils";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onPreview: (file: File) => Promise<PreviewCiclo>;
-  onConfirmar: (file: File) => void;
+  onReview: () => void;
   isLoading: boolean;
 }
 
-export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoading }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+export function ExcelUploadModal({ open, onClose, onPreview, onReview, isLoading }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewCiclo | null>(null);
   const [error, setError] = useState("");
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
+  function selectFile(f: File) {
+    if (!f.name.match(/\.(xlsx|xls)$/i)) {
+      setError("Solo se aceptan archivos .xlsx o .xls");
+      return;
+    }
     setFile(f);
     setPreview(null);
     setError("");
@@ -35,12 +39,6 @@ export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoad
     }
   }
 
-  function handleConfirmar() {
-    if (!file) return;
-    onConfirmar(file);
-    handleClose();
-  }
-
   function handleClose() {
     setFile(null);
     setPreview(null);
@@ -55,16 +53,7 @@ export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoad
           <DialogTitle>Nuevo Ciclo de Envío</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button variant="outline" className="w-full" onClick={() => inputRef.current?.click()}>
-            {file ? file.name : "Seleccionar Excel de deudores"}
-          </Button>
+          <FileDropzone file={file} onSelect={selectFile} />
 
           {file && !preview && (
             <Button className="w-full" onClick={handlePreview} disabled={isLoading}>
@@ -72,27 +61,29 @@ export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoad
             </Button>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           {preview && (
-            <div className="rounded border p-4 space-y-2 bg-gray-50">
-              <h3 className="font-semibold text-sm">Resumen del ciclo</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-gray-600">Para enviar:</span>
-                <span className="font-medium text-green-700">{preview.para_enviar}</span>
-                <span className="text-gray-600">Sin email:</span>
-                <span className="font-medium text-amber-600">{preview.sin_email}</span>
-                <span className="text-gray-600">Filtrados:</span>
-                <span className="font-medium text-gray-500">{preview.filtrados}</span>
-                <span className="text-gray-600">Total deudores:</span>
-                <span className="font-medium">{preview.total_deudores}</span>
+            <div className="rounded-md border border-border bg-secondary/40 p-4 space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Resumen del ciclo
+              </h3>
+              <div className="grid grid-cols-2 gap-y-2 text-sm">
+                <SummaryRow label="Para enviar" value={preview.para_enviar} dot="bg-success" />
+                <SummaryRow label="Sin email" value={preview.sin_email} dot="bg-warning" />
+                <SummaryRow label="Filtrados" value={preview.filtrados} dot="bg-muted-foreground" />
+                <span className="text-muted-foreground">Total deudores</span>
+                <span className="text-right tabular-nums font-medium text-foreground">
+                  {preview.total_deudores}
+                </span>
               </div>
+
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setPreview(null)}>
                   Volver
                 </Button>
-                <Button className="flex-1" onClick={handleConfirmar}>
-                  Confirmar envío
+                <Button className="flex-1" onClick={onReview}>
+                  Ver detalle
                 </Button>
               </div>
             </div>
@@ -100,5 +91,17 @@ export function ExcelUploadModal({ open, onClose, onPreview, onConfirmar, isLoad
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SummaryRow({ label, value, dot }: { label: string; value: number; dot: string }) {
+  return (
+    <>
+      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+        <span className={cn("h-1.5 w-1.5 rounded-full", dot)} aria-hidden />
+        {label}
+      </span>
+      <span className="text-right tabular-nums font-medium text-foreground">{value}</span>
+    </>
   );
 }

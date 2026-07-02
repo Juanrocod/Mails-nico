@@ -13,7 +13,7 @@ from app.core.dependencies import get_current_user
 from app.models.ciclo import Ciclo
 from app.models.envio import Envio, EstadoEnvio, MotivoFiltrado
 from app.models.user import User
-from app.schemas.ciclo import PreviewResponse
+from app.schemas.ciclo import PreviewItem, PreviewResponse
 from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
 from app.services.excel_joiner import join_deudores
@@ -43,6 +43,35 @@ async def preview_ciclo(
         filtrados=len(preview.filtrados),
         total_deudores=len(deudores),
         monto_total_enviar=sum((e.monto for e in preview.para_enviar), start=0),
+        items_para_enviar=[
+            PreviewItem(
+                clave_union=e.clave_union,
+                nombre_consorcio=e.nombre,
+                email=e.email,
+                monto=e.monto,
+                localidad=e.localidad,
+            )
+            for e in preview.para_enviar
+        ],
+        items_sin_email=[
+            PreviewItem(
+                clave_union=d.clave_union,
+                nombre_consorcio=d.nombre,
+                monto=d.monto,
+                localidad=d.localidad,
+            )
+            for d in preview.sin_email
+        ],
+        items_filtrados=[
+            PreviewItem(
+                clave_union=d.clave_union,
+                nombre_consorcio=d.nombre,
+                monto=d.monto,
+                localidad=d.localidad,
+                motivo_filtrado=motivo,
+            )
+            for d, motivo in preview.filtrados
+        ],
     )
 
 

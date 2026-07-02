@@ -47,8 +47,13 @@ export default function SeguimientoPage() {
   const rebotados = envios.filter((e) => e.estado === "REBOTADO");
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Seguimiento</h1>
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex items-baseline gap-3">
+        <h1 className="text-xl font-semibold text-foreground">Seguimiento</h1>
+        <span className="text-sm text-muted-foreground">
+          Estado de respuesta de los mails del ciclo activo
+        </span>
+      </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
@@ -77,9 +82,11 @@ export default function SeguimientoPage() {
                   : rebotados;
           return (
             <TabsContent key={tab} value={tab}>
-              <div className="space-y-2 mt-2">
+              <div className="space-y-3 mt-2">
                 {list.length === 0 ? (
-                  <p className="text-sm text-gray-500 py-4">Sin registros.</p>
+                  <div className="text-center py-16">
+                    <p className="text-sm text-muted-foreground">Sin registros.</p>
+                  </div>
                 ) : (
                   list.map((e) => (
                     <EnvioCard

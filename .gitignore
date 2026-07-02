@@ -45,6 +45,9 @@ frontend/build/
 # Logs
 *.log
 
+# Excels de prueba locales
+excel_*_prueba.xlsx
+
 # Claude Code — archivos personales
 CLAUDE.local.md
 .claude/settings.local.json
