@@ -1,42 +1,40 @@
-import email
 from email.message import EmailMessage
-from app.services.reply_classifier import classify
 from app.models.envio import EstadoEnvio
+from app.services.reply_classifier import classify
 
 
-def _make_msg(from_addr: str, has_attachment: bool = False, body: str = "Texto") -> EmailMessage:
+def test_classify_mailer_daemon_es_rebotado():
     msg = EmailMessage()
-    msg["From"] = from_addr
-    msg["Subject"] = "Re: Recordatorio"
-    msg.set_content(body)
-    if has_attachment:
-        msg.add_attachment(b"%PDF-1.4 fake", maintype="application", subtype="pdf", filename="comprobante.pdf")
-    return msg
+    msg["From"] = "MAILER-DAEMON@yahoo.com"
+    msg.set_content("Delivery failed")
+    assert classify(msg) == (EstadoEnvio.REBOTADO, False)
 
 
-def test_mailer_daemon_es_rebotado():
-    msg = _make_msg("mailer-daemon@yahoo.com")
-    assert classify(msg) == EstadoEnvio.REBOTADO
-
-
-def test_postmaster_es_rebotado():
-    msg = _make_msg("postmaster@dominio.com")
-    assert classify(msg) == EstadoEnvio.REBOTADO
-
-
-def test_adjunto_pdf_es_pago():
-    msg = _make_msg("consorcio@mail.com", has_attachment=True)
-    assert classify(msg) == EstadoEnvio.PAGO
-
-
-def test_adjunto_imagen_es_pago():
+def test_classify_postmaster_es_rebotado():
     msg = EmailMessage()
-    msg["From"] = "consorcio@mail.com"
+    msg["From"] = "postmaster@dominio.com"
+    msg.set_content("Undeliverable")
+    assert classify(msg) == (EstadoEnvio.REBOTADO, False)
+
+
+def test_classify_con_adjunto_pdf_es_pago():
+    msg = EmailMessage()
+    msg["From"] = "cliente@mail.com"
     msg.set_content("Adjunto comprobante")
-    msg.add_attachment(b"fake-png", maintype="image", subtype="png", filename="pago.png")
-    assert classify(msg) == EstadoEnvio.PAGO
+    msg.add_attachment(b"%PDF-1.4 fake", maintype="application", subtype="pdf", filename="comprobante.pdf")
+    assert classify(msg) == (EstadoEnvio.PAGO, True)
 
 
-def test_solo_texto_es_contestado():
-    msg = _make_msg("consorcio@mail.com")
-    assert classify(msg) == EstadoEnvio.CONTESTADO
+def test_classify_con_adjunto_imagen_es_pago():
+    msg = EmailMessage()
+    msg["From"] = "cliente@mail.com"
+    msg.set_content("Foto del pago")
+    msg.add_attachment(b"fake-image-bytes", maintype="image", subtype="png", filename="pago.png")
+    assert classify(msg) == (EstadoEnvio.PAGO, True)
+
+
+def test_classify_solo_texto_es_contestado():
+    msg = EmailMessage()
+    msg["From"] = "cliente@mail.com"
+    msg.set_content("Ya voy a pagar la semana que viene")
+    assert classify(msg) == (EstadoEnvio.CONTESTADO, False)
