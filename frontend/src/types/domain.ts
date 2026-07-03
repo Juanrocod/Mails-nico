@@ -20,6 +20,8 @@ export interface Envio {
   motivo_filtrado: MotivoFiltrado | null;
   message_id: string | null;
   reply_snippet: string | null;
+  reply_en: string | null;
+  tiene_adjunto: boolean;
   enviado_en: string | null;
   actualizado_en: string;
 }

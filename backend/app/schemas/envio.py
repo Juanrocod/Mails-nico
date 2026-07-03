@@ -20,6 +20,8 @@ class EnvioSchema(BaseModel):
     motivo_filtrado: Optional[MotivoFiltrado]
     message_id: Optional[str]
     reply_snippet: Optional[str]
+    reply_en: Optional[datetime]
+    tiene_adjunto: bool
     enviado_en: Optional[datetime]
     actualizado_en: datetime
 

@@ -47,6 +47,9 @@ export function EnvioDrawer({ envio, onClose, onMarcarPago }: Props) {
                 {envio.enviado_en && (
                   <Row label="Enviado" value={new Date(envio.enviado_en).toLocaleString("es-AR")} />
                 )}
+                {envio.reply_en && (
+                  <Row label="Respondido" value={new Date(envio.reply_en).toLocaleString("es-AR")} />
+                )}
               </section>
 
               {envio.reply_snippet && (
