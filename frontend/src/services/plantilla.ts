@@ -13,7 +13,13 @@ export async function updatePlantilla(data: Plantilla): Promise<Plantilla> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!r.ok) throw new Error("Error guardando plantilla");
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d: { msg?: string }) => d.msg).join("; ")
+      : err.detail;
+    throw new Error(detail ?? "Error guardando plantilla");
+  }
   return r.json();
 }
 

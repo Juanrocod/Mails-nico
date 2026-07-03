@@ -56,8 +56,8 @@ export default function PlantillaPage() {
     try {
       await updatePlantilla(form);
       setStatus("Guardado correctamente");
-    } catch {
-      setStatus("Error al guardar");
+    } catch (e: unknown) {
+      setStatus(e instanceof Error ? e.message : "Error al guardar");
     }
   }
 
