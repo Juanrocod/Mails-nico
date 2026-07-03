@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import os
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -45,6 +47,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestLoggingMiddleware)
+
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(auth.router)
 app.include_router(plantilla.router)
