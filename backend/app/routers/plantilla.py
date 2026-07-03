@@ -52,6 +52,12 @@ async def upload_logo(
     with open(os.path.join("uploads", filename), "wb") as f:
         f.write(content)
 
+    if not settings.BACKEND_PUBLIC_URL:
+        raise HTTPException(
+            status_code=422,
+            detail="Configurá BACKEND_PUBLIC_URL antes de subir un logo (necesario para que la imagen cargue en los mails).",
+        )
+
     plantilla = db_config.load_plantilla(db)
     plantilla.logo_url = f"{settings.BACKEND_PUBLIC_URL}/uploads/{filename}"
     db.commit()

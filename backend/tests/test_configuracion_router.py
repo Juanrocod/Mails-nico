@@ -33,3 +33,12 @@ def test_put_configuracion_yahoo_persiste(client, auth_headers):
 def test_get_configuracion_yahoo_requiere_auth(client):
     r = client.get("/configuracion/yahoo")
     assert r.status_code in (401, 403)
+
+
+def test_put_configuracion_yahoo_rechaza_password_vacia(client, auth_headers):
+    r = client.put(
+        "/configuracion/yahoo",
+        json={"yahoo_email": "cliente@yahoo.com", "yahoo_app_password": ""},
+        headers=auth_headers,
+    )
+    assert r.status_code == 422

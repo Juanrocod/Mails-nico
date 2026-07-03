@@ -1,10 +1,10 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class ConfiguracionYahooRequest(BaseModel):
     yahoo_email: EmailStr
-    yahoo_app_password: str
+    yahoo_app_password: str = Field(min_length=1)
 
 
 class ConfiguracionYahooResponse(BaseModel):
