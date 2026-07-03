@@ -31,3 +31,36 @@ def test_put_plantilla_persiste(client, auth_headers):
     }, headers=auth_headers)
     r = client.get("/plantilla", headers=auth_headers)
     assert r.json()["asunto"] == "Recordatorio"
+
+
+def test_put_plantilla_rechaza_palabra_prohibida_en_asunto(client, auth_headers):
+    r = client.put("/plantilla", json={
+        "asunto": "GRATIS: recordatorio de deuda",
+        "cuerpo_html": "<p>texto normal</p>",
+        "nombre_empresa": "SA",
+        "color_primario": "#000000",
+        "monto_minimo": 0,
+    }, headers=auth_headers)
+    assert r.status_code == 422
+
+
+def test_put_plantilla_rechaza_palabra_prohibida_en_cuerpo(client, auth_headers):
+    r = client.put("/plantilla", json={
+        "asunto": "Recordatorio de deuda",
+        "cuerpo_html": "<p>Haga clic ya para regularizar su situación</p>",
+        "nombre_empresa": "SA",
+        "color_primario": "#000000",
+        "monto_minimo": 0,
+    }, headers=auth_headers)
+    assert r.status_code == 422
+
+
+def test_put_plantilla_acepta_texto_sin_palabras_prohibidas(client, auth_headers):
+    r = client.put("/plantilla", json={
+        "asunto": "Recordatorio de deuda pendiente",
+        "cuerpo_html": "<p>Le informamos que registra una deuda con nuestra empresa.</p>",
+        "nombre_empresa": "SA",
+        "color_primario": "#000000",
+        "monto_minimo": 0,
+    }, headers=auth_headers)
+    assert r.status_code == 200
