@@ -77,10 +77,12 @@ def _poll_inbox():
                 if matched_envio is None:
                     continue
 
-                new_estado = classify(msg)
+                new_estado, tiene_adjunto = classify(msg)
                 snippet = _extract_snippet(msg)
                 matched_envio.estado = new_estado
                 matched_envio.reply_snippet = snippet
+                matched_envio.reply_en = datetime.now(timezone.utc)
+                matched_envio.tiene_adjunto = tiene_adjunto
                 matched_envio.actualizado_en = datetime.now(timezone.utc)
                 db.add(matched_envio)
                 _logger.info("Envio %s → %s", matched_envio.id, new_estado)
