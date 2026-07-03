@@ -1,19 +1,13 @@
-import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.validators import is_valid_email
 from app.models.cliente_maestro import ClienteMaestro
 from app.models.envio import Envio, EstadoEnvio
 from app.services.excel_parser import DeudorRow
-
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def _is_valid_email(email: str) -> bool:
-    return bool(_EMAIL_RE.match(email))
 
 
 @dataclass
@@ -67,7 +61,7 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
         if deudor.monto < monto_minimo:
             filtrados.append((deudor, "MONTO_MINIMO"))
             continue
-        if not cliente.email or not _is_valid_email(cliente.email):
+        if not cliente.email or not is_valid_email(cliente.email):
             sin_email.append(deudor)
             continue
         ciclo_ant = _ciclos_consecutivos_deudor(db, deudor.clave_union)

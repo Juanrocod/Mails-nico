@@ -1,6 +1,8 @@
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from app.core.validators import is_valid_email
 
 
 class ClienteMaestroSchema(BaseModel):
@@ -19,3 +21,24 @@ class MaestroUploadResponse(BaseModel):
     nuevos: int
     actualizados: int
     total: int
+
+
+class ClienteMaestroUpdate(BaseModel):
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+    localidad: Optional[str] = None
+    prefiere_no_recibir_email: Optional[bool] = None
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_no_vacio(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("El nombre no puede estar vacío")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def email_valido(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip() and not is_valid_email(v.strip()):
+            raise ValueError("El email no tiene un formato válido")
+        return v

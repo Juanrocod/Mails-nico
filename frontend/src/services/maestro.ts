@@ -14,3 +14,22 @@ export async function getMaestro(): Promise<ClienteMaestro[]> {
   if (!r.ok) throw new Error("Error cargando maestro");
   return r.json();
 }
+
+export async function updateCliente(
+  id: string,
+  data: Partial<Pick<ClienteMaestro, "nombre" | "email" | "localidad" | "prefiere_no_recibir_email">>
+): Promise<ClienteMaestro> {
+  const r = await apiFetch(`/maestro/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d: { msg?: string }) => d.msg).join("; ")
+      : err.detail;
+    throw new Error(detail ?? "Error guardando el cliente");
+  }
+  return r.json();
+}
