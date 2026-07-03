@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging, RequestLoggingMiddleware
-from app.routers import auth, plantilla, maestro, ciclos
+from app.routers import auth, plantilla, maestro, ciclos, configuracion
 from app.services import imap_watcher
 
 setup_logging()
@@ -50,6 +50,7 @@ app.include_router(auth.router)
 app.include_router(plantilla.router)
 app.include_router(maestro.router)
 app.include_router(ciclos.router)
+app.include_router(configuracion.router)
 
 
 # Run migrations manually before starting: alembic upgrade head
