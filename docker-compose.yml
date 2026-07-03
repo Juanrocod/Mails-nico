@@ -20,8 +20,10 @@ services:
       DATABASE_URL: postgresql://gestion:${DB_PASSWORD:-changeme}@db:5432/gestion_mails
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
-      TOTP_ISSUER: ${TOTP_ISSUER:-GestionMails}
+      YAHOO_EMAIL: ${YAHOO_EMAIL:-placeholder@yahoo.com}
+      YAHOO_APP_PASSWORD: ${YAHOO_APP_PASSWORD:-placeholder}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-}
     depends_on:
       db:
         condition: service_healthy

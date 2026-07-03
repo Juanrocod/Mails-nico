@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: mails-nico-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: YAHOO_EMAIL
+        value: placeholder@yahoo.com
+      - key: YAHOO_APP_PASSWORD
+        value: placeholder
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: BACKEND_PUBLIC_URL
+        sync: false
