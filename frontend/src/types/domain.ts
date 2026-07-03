@@ -62,3 +62,8 @@ export interface Plantilla {
   color_primario: string;
   monto_minimo: number;
 }
+
+export interface ConfiguracionYahoo {
+  yahoo_email: string | null;
+  configurado: boolean;
+}
