@@ -8,6 +8,7 @@ from typing import Awaitable, Callable, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.services import config_service
 from app.models.envio import Envio
 from app.services import db_config
@@ -55,7 +56,7 @@ async def enviar_ciclo(
             monto=envio.monto,
             ciclo_numero_anterior=envio.ciclo_numero - 1,
         )
-        msg = generate_email(parsed, plantilla)
+        msg = generate_email(parsed, plantilla, unsubscribe_base_url=settings.BACKEND_PUBLIC_URL)
         msg["From"] = from_email
         msg_id = f"<{uuid.uuid4().hex}@yahoo.com>"
         msg["Message-ID"] = msg_id

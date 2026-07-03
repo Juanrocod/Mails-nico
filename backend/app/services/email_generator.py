@@ -5,6 +5,7 @@ from email.message import EmailMessage
 from jinja2 import Environment, FileSystemLoader
 from premailer import transform
 
+from app.core.security import generate_unsubscribe_token
 from app.models.plantilla import Plantilla
 from app.services.excel_joiner import EnvioParsed
 
@@ -18,11 +19,11 @@ def generate_email(
     unsubscribe_base_url: str = "",
 ) -> EmailMessage:
     cuerpo_renderizado = _render_cuerpo(envio, plantilla)
-    unsubscribe_url = (
-        f"{unsubscribe_base_url}/unsubscribe?clave={envio.clave_union}"
-        if unsubscribe_base_url
-        else "#"
-    )
+    if unsubscribe_base_url:
+        token = generate_unsubscribe_token(envio.clave_union)
+        unsubscribe_url = f"{unsubscribe_base_url}/unsubscribe/{token}"
+    else:
+        unsubscribe_url = "#"
     template = _jinja_env.get_template("mail_cobro.html")
     html_raw = template.render(
         nombre=envio.nombre,
