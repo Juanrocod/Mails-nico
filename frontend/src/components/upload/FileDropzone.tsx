@@ -6,9 +6,17 @@ interface Props {
   file: File | null;
   onSelect: (file: File) => void;
   disabled?: boolean;
+  accept?: string;
+  hint?: string;
 }
 
-export function FileDropzone({ file, onSelect, disabled }: Props) {
+export function FileDropzone({
+  file,
+  onSelect,
+  disabled,
+  accept = ".xlsx,.xls",
+  hint = "Solo .xlsx o .xls",
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -31,7 +39,7 @@ export function FileDropzone({ file, onSelect, disabled }: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls"
+        accept={accept}
         className="hidden"
         onChange={handleChange}
         disabled={disabled}
@@ -64,7 +72,7 @@ export function FileDropzone({ file, onSelect, disabled }: Props) {
         <p className="text-sm font-medium text-foreground">
           {file ? file.name : "Arrastrá el archivo o hacé click para seleccionar"}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">Solo .xlsx o .xls</p>
+        <p className="text-xs text-muted-foreground mt-1">{hint}</p>
       </div>
     </>
   );
