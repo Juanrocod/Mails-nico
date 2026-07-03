@@ -49,3 +49,19 @@ def test_join_sin_email_en_maestro(db):
     deudores = [DeudorRow("C004", "Sin Email", "CABA", Decimal("2000"))]
     preview = join_deudores(db, deudores, monto_minimo=Decimal("0"))
     assert len(preview.sin_email) == 1
+
+
+def test_join_email_con_formato_invalido_cae_en_sin_email(db):
+    _add_cliente(db, "C010", "Consorcio Diez", email="esto-no-es-un-email")
+    deudores = [DeudorRow("C010", "Consorcio Diez", "CABA", Decimal("3000"))]
+    preview = join_deudores(db, deudores, monto_minimo=Decimal("0"))
+    assert len(preview.sin_email) == 1
+    assert len(preview.para_enviar) == 0
+
+
+def test_join_email_valido_pasa_a_para_enviar(db):
+    _add_cliente(db, "C011", "Consorcio Once", email="valido@dominio.com.ar")
+    deudores = [DeudorRow("C011", "Consorcio Once", "CABA", Decimal("3000"))]
+    preview = join_deudores(db, deudores, monto_minimo=Decimal("0"))
+    assert len(preview.para_enviar) == 1
+    assert len(preview.sin_email) == 0
