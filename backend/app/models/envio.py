@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
-from sqlalchemy import Column, String, Text, Numeric, Integer, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, String, Text, Numeric, Integer, DateTime, ForeignKey, Enum, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -34,6 +34,8 @@ class Envio(Base):
     motivo_filtrado = Column(Enum(MotivoFiltrado), nullable=True)
     message_id = Column(String(512), nullable=True, index=True)
     reply_snippet = Column(Text, nullable=True)
+    reply_en = Column(DateTime, nullable=True)
+    tiene_adjunto = Column(Boolean, nullable=False, default=False)
     enviado_en = Column(DateTime, nullable=True)
     actualizado_en = Column(
         DateTime,
