@@ -16,3 +16,14 @@ export async function updatePlantilla(data: Plantilla): Promise<Plantilla> {
   if (!r.ok) throw new Error("Error guardando plantilla");
   return r.json();
 }
+
+export async function uploadLogo(file: File): Promise<Plantilla> {
+  const form = new FormData();
+  form.append("file", file);
+  const r = await apiFetch("/plantilla/logo", { method: "POST", body: form });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Error subiendo el logo");
+  }
+  return r.json();
+}

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
-import { getPlantilla, updatePlantilla } from "../services/plantilla";
+import { FileDropzone } from "../components/upload/FileDropzone";
+import { getPlantilla, updatePlantilla, uploadLogo } from "../services/plantilla";
 import type { Plantilla } from "../types/domain";
 
 const VARIABLES = [
@@ -60,6 +61,17 @@ export default function PlantillaPage() {
     }
   }
 
+  async function handleLogoSelect(file: File) {
+    setStatus("Subiendo logo...");
+    try {
+      const updated = await uploadLogo(file);
+      setForm(updated);
+      setStatus("Logo actualizado");
+    } catch (e: unknown) {
+      setStatus(e instanceof Error ? e.message : "Error al subir el logo");
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div>
@@ -103,6 +115,23 @@ export default function PlantillaPage() {
           <Input
             value={form.nombre_empresa}
             onChange={(e) => set("nombre_empresa", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Logo</label>
+          {form.logo_url && (
+            <img
+              src={form.logo_url}
+              alt="Logo actual"
+              className="h-12 max-w-[200px] object-contain rounded border border-border bg-secondary/30 p-2"
+            />
+          )}
+          <FileDropzone
+            file={null}
+            onSelect={handleLogoSelect}
+            accept="image/png,image/jpeg,image/webp"
+            hint="PNG, JPG o WEBP — máximo 2MB"
           />
         </div>
 
