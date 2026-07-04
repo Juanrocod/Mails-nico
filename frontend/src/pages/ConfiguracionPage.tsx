@@ -91,8 +91,14 @@ export default function ConfiguracionPage() {
         <p className="text-sm text-muted-foreground mt-1">Proveedor y credenciales de la cuenta de email.</p>
       </div>
 
+      {(proveedor === "yahoo" ? yahooConfigurado : gmailConfigurado) && (
+        <div className="max-w-sm rounded-md bg-success px-3 py-2 text-sm text-success-foreground">
+          Mail activo: {proveedor === "yahoo" ? yahooEmail : gmailEmail}
+        </div>
+      )}
+
       {enviosPendientes > 0 && (
-        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+        <div className="max-w-sm rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
           Hay {enviosPendientes} envío{enviosPendientes === 1 ? "" : "s"} esperando respuesta. Si cambiás de
           proveedor ahora, el sistema deja de poder detectar esas respuestas.
         </div>
