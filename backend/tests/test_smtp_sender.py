@@ -71,3 +71,42 @@ def test_enviar_ciclo_respeta_rate_limit(db, plantilla_default):
 
     assert len(calls) == 4
     mock_sleep.assert_called_once()
+
+
+def test_enviar_ciclo_usa_host_yahoo_por_default(db, plantilla_default):
+    ciclo = _make_ciclo(db)
+    envio = _make_envio_db(db, ciclo, "C010", "Consorcio", "test@mail.com", 5000)
+
+    async def on_progress(e):
+        pass
+
+    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+        mock_send.return_value = "<msg-id@yahoo.com>"
+        asyncio.get_event_loop().run_until_complete(
+            enviar_ciclo([envio], db, on_progress, rate_limit_override=(2, 0.01))
+        )
+
+    args = mock_send.call_args.args
+    assert args[3] == "smtp.mail.yahoo.com"
+    assert args[4] == 587
+
+
+def test_enviar_ciclo_usa_host_gmail_cuando_esta_activo(db, plantilla_default):
+    from app.services import config_service
+    config_service.save_active_provider(db, "gmail")
+
+    ciclo = _make_ciclo(db)
+    envio = _make_envio_db(db, ciclo, "C011", "Consorcio2", "test2@mail.com", 3000)
+
+    async def on_progress(e):
+        pass
+
+    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+        mock_send.return_value = "<msg-id@gmail.com>"
+        asyncio.get_event_loop().run_until_complete(
+            enviar_ciclo([envio], db, on_progress, rate_limit_override=(2, 0.01))
+        )
+
+    args = mock_send.call_args.args
+    assert args[3] == "smtp.gmail.com"
+    assert args[4] == 587

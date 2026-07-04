@@ -9,6 +9,7 @@ from typing import Awaitable, Callable, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.email_providers import PROVIDERS
 from app.services import config_service
 from app.models.envio import Envio
 from app.services import db_config
@@ -20,9 +21,9 @@ _logger = logging.getLogger("mails_nico.smtp")
 _DEFAULT_RATE_LIMIT: Tuple[int, float] = (5, 30.0)  # 5 mails, luego esperar 30 segundos
 
 
-def _send_single_email(msg, from_email: str, app_password: str) -> str:
+def _send_single_email(msg, from_email: str, app_password: str, smtp_host: str, smtp_port: int) -> str:
     context = ssl.create_default_context()
-    with smtplib.SMTP("smtp.mail.yahoo.com", 587) as server:
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.starttls(context=context)
         server.login(from_email, app_password)
         server.send_message(msg)
@@ -37,7 +38,8 @@ async def enviar_ciclo(
 ) -> None:
     plantilla = db_config.load_plantilla(db)
     batch_size, batch_wait = rate_limit_override or _DEFAULT_RATE_LIMIT
-    from_email, app_password = config_service.get_yahoo_credentials(db)
+    provider = PROVIDERS[config_service.get_active_provider(db)]
+    from_email, app_password = config_service.get_active_credentials(db)
 
     sent_in_batch = 0
     loop = asyncio.get_running_loop()
@@ -58,12 +60,18 @@ async def enviar_ciclo(
         )
         msg = generate_email(parsed, plantilla, unsubscribe_base_url=settings.BACKEND_PUBLIC_URL)
         msg["From"] = from_email
-        msg_id = f"<{uuid.uuid4().hex}@yahoo.com>"
+        msg_id = f"<{uuid.uuid4().hex}@{provider.message_id_domain}>"
         msg["Message-ID"] = msg_id
 
         try:
             returned_id = await loop.run_in_executor(
-                None, _send_single_email, msg, from_email, app_password
+                None,
+                _send_single_email,
+                msg,
+                from_email,
+                app_password,
+                provider.smtp_host,
+                provider.smtp_port,
             )
             envio.message_id = returned_id or msg_id
             envio.enviado_en = datetime.now(timezone.utc)
