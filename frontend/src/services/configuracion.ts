@@ -1,5 +1,11 @@
 import { apiFetch } from "./api";
-import type { ConfiguracionYahoo, ConfiguracionGmail, ConfiguracionProveedor, ProveedorEmail } from "../types/domain";
+import type {
+  ConfiguracionYahoo,
+  ConfiguracionGmail,
+  ConfiguracionProveedor,
+  ProveedorEmail,
+  ConfiguracionEnviosPendientes,
+} from "../types/domain";
 
 export async function getConfiguracionYahoo(): Promise<ConfiguracionYahoo> {
   const r = await apiFetch("/configuracion/yahoo");
@@ -61,5 +67,11 @@ export async function updateProveedorActivo(proveedor: ProveedorEmail): Promise<
     const err = await r.json().catch(() => ({}));
     throw new Error(err.detail ?? "Error guardando el proveedor activo");
   }
+  return r.json();
+}
+
+export async function getEnviosNoContestadosCount(): Promise<ConfiguracionEnviosPendientes> {
+  const r = await apiFetch("/configuracion/envios-no-contestados-count");
+  if (!r.ok) throw new Error("Error cargando envios pendientes");
   return r.json();
 }

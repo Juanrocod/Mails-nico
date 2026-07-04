@@ -8,6 +8,7 @@ import {
   updateConfiguracionGmail,
   getProveedorActivo,
   updateProveedorActivo,
+  getEnviosNoContestadosCount,
 } from "../services/configuracion";
 import type { ProveedorEmail } from "../types/domain";
 
@@ -25,6 +26,8 @@ export default function ConfiguracionPage() {
   const [gmailConfigurado, setGmailConfigurado] = useState(false);
   const [gmailStatus, setGmailStatus] = useState("");
 
+  const [enviosPendientes, setEnviosPendientes] = useState(0);
+
   useEffect(() => {
     getProveedorActivo()
       .then((data) => setProveedor(data.proveedor))
@@ -40,6 +43,9 @@ export default function ConfiguracionPage() {
         setGmailConfigurado(data.configurado);
         if (data.gmail_email) setGmailEmail(data.gmail_email);
       })
+      .catch(() => {});
+    getEnviosNoContestadosCount()
+      .then((data) => setEnviosPendientes(data.count))
       .catch(() => {});
   }, []);
 
@@ -84,6 +90,13 @@ export default function ConfiguracionPage() {
         <h1 className="text-xl font-semibold text-foreground">Configuración</h1>
         <p className="text-sm text-muted-foreground mt-1">Proveedor y credenciales de la cuenta de email.</p>
       </div>
+
+      {enviosPendientes > 0 && (
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+          Hay {enviosPendientes} envío{enviosPendientes === 1 ? "" : "s"} esperando respuesta. Si cambiás de
+          proveedor ahora, el sistema deja de poder detectar esas respuestas.
+        </div>
+      )}
 
       <div className="max-w-sm space-y-4">
         <div className="space-y-1.5">

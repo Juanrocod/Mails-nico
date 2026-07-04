@@ -102,3 +102,37 @@ def test_put_configuracion_gmail_rechaza_password_vacia(client, auth_headers):
 def test_get_configuracion_gmail_requiere_auth(client):
     r = client.get("/configuracion/gmail")
     assert r.status_code in (401, 403)
+
+
+def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_headers, db):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    baseline = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers).json()["count"]
+
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="CNT-PEND-1", nombre_consorcio="Cons",
+        email="cnt1@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="CNT-PAGO-1", nombre_consorcio="Cons2",
+        email="cnt2@mail.com", monto=Decimal("2000"), estado=EstadoEnvio.PAGO,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    r = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["count"] == baseline + 1
+
+
+def test_get_envios_no_contestados_count_requiere_auth(client):
+    r = client.get("/configuracion/envios-no-contestados-count")
+    assert r.status_code in (401, 403)

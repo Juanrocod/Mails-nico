@@ -32,3 +32,7 @@ class ConfiguracionProveedorRequest(BaseModel):
 
 class ConfiguracionProveedorResponse(BaseModel):
     proveedor: Literal["yahoo", "gmail"]
+
+
+class ConfiguracionEnviosPendientesResponse(BaseModel):
+    count: int

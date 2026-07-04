@@ -80,3 +80,7 @@ export interface ConfiguracionGmail {
   gmail_email: string | null;
   configurado: boolean;
 }
+
+export interface ConfiguracionEnviosPendientes {
+  count: number;
+}
