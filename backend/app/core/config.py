@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str
     YAHOO_EMAIL: str
     YAHOO_APP_PASSWORD: str
+    GMAIL_EMAIL: str = ""
+    GMAIL_APP_PASSWORD: str = ""
     ACCESS_TOKEN_EXPIRE_HOURS: int = 8
     REFRESH_TOKEN_EXPIRE_HOURS: int = 8
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000"
