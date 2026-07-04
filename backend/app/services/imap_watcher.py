@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from app.core.database import SessionLocal
+from app.core.email_providers import PROVIDERS
 from app.models.envio import Envio, EstadoEnvio
 from app.services import config_service
 from app.services.reply_classifier import classify
@@ -49,10 +50,11 @@ def _poll_inbox():
 
         message_id_map = {e.message_id: e for e in active_envios}
 
-        yahoo_email, yahoo_app_password = config_service.get_yahoo_credentials(db)
-        mail = imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
+        provider = PROVIDERS[config_service.get_active_provider(db)]
+        email_addr, app_password = config_service.get_active_credentials(db)
+        mail = imaplib.IMAP4_SSL(provider.imap_host, provider.imap_port)
         try:
-            mail.login(yahoo_email, yahoo_app_password)
+            mail.login(email_addr, app_password)
             mail.select("INBOX")
 
             since_date = cutoff.strftime("%d-%b-%Y")
