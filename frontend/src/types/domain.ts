@@ -69,3 +69,14 @@ export interface ConfiguracionYahoo {
   yahoo_email: string | null;
   configurado: boolean;
 }
+
+export type ProveedorEmail = "yahoo" | "gmail";
+
+export interface ConfiguracionProveedor {
+  proveedor: ProveedorEmail;
+}
+
+export interface ConfiguracionGmail {
+  gmail_email: string | null;
+  configurado: boolean;
+}
