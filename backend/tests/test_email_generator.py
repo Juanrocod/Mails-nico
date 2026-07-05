@@ -72,3 +72,48 @@ def test_unsubscribe_url_usa_token_firmado():
     end = html.index('"', start)
     token = html[start:end]
     assert verify_unsubscribe_token(token) == "C001"
+
+
+def test_generate_email_texto_plano_tiene_contenido_real(plantilla_default):
+    msg = generate_email(_make_envio(), plantilla_default)
+    texto = msg.get_body(preferencelist=("plain",)).get_content()
+    assert "requiere un cliente de correo" not in texto
+    assert "Consorcio Test" in texto
+    assert "5000.50" in texto
+
+
+def test_generate_email_sin_unsubscribe_base_url_no_agrega_header():
+    from decimal import Decimal
+    from app.services.excel_joiner import EnvioParsed
+    from app.models.plantilla import Plantilla
+
+    envio = EnvioParsed(
+        clave_union="C001", nombre="Consorcio Uno", email="uno@mail.com",
+        localidad=None, monto=Decimal("5000"), ciclo_numero_anterior=0,
+    )
+    plantilla = Plantilla(
+        asunto="Deuda", cuerpo_html="<p>Hola {{nombre}}</p>",
+        nombre_empresa="SA", color_primario="#1a56db", monto_minimo=0,
+    )
+    msg = generate_email(envio, plantilla)
+    assert msg["List-Unsubscribe"] is None
+
+
+def test_generate_email_con_unsubscribe_base_url_agrega_header():
+    from decimal import Decimal
+    from app.services.excel_joiner import EnvioParsed
+    from app.models.plantilla import Plantilla
+
+    envio = EnvioParsed(
+        clave_union="C001", nombre="Consorcio Uno", email="uno@mail.com",
+        localidad=None, monto=Decimal("5000"), ciclo_numero_anterior=0,
+    )
+    plantilla = Plantilla(
+        asunto="Deuda", cuerpo_html="<p>Hola {{nombre}}</p>",
+        nombre_empresa="SA", color_primario="#1a56db", monto_minimo=0,
+    )
+    msg = generate_email(envio, plantilla, unsubscribe_base_url="https://api.ejemplo.com")
+    header = msg["List-Unsubscribe"]
+    assert header is not None
+    assert header.startswith("<https://api.ejemplo.com/unsubscribe/")
+    assert header.endswith(">")
