@@ -72,6 +72,7 @@ export function reenviarFallidos(
     id?: string;
     done?: boolean;
     saltados?: { id: string; motivo: string }[];
+    error?: string;
   }) => void,
 ): () => void {
   const token = localStorage.getItem("access_token");
@@ -81,26 +82,33 @@ export function reenviarFallidos(
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal: controller.signal,
-  }).then(async (r) => {
-    if (!r.ok || !r.body) return;
-    const reader = r.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            onProgress(JSON.parse(line.slice(6)));
-          } catch {}
+  })
+    .then(async (r) => {
+      if (!r.ok || !r.body) {
+        onProgress({ enviado: 0, total: 0, done: true, error: "Error al reenviar los mails" });
+        return;
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              onProgress(JSON.parse(line.slice(6)));
+            } catch {}
+          }
         }
       }
-    }
-  });
+    })
+    .catch(() => {
+      onProgress({ enviado: 0, total: 0, done: true, error: "Error al reenviar los mails" });
+    });
 
   return () => controller.abort();
 }

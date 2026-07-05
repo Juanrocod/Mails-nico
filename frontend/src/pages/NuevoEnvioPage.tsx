@@ -42,6 +42,7 @@ export default function NuevoEnvioPage() {
   const [reenviandoTodos, setReenviandoTodos] = useState(false);
   const [reenvioProgreso, setReenvioProgreso] = useState<{ enviado: number; total: number } | null>(null);
   const [reenvioError, setReenvioError] = useState("");
+  const [reenvioSaltados, setReenvioSaltados] = useState<{ id: string; motivo: string }[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -94,11 +95,17 @@ export default function NuevoEnvioPage() {
   function handleReenviarTodos() {
     setReenviandoTodos(true);
     setReenvioError("");
+    setReenvioSaltados([]);
     setReenvioProgreso({ enviado: 0, total: 0 });
     reenviarFallidos((data) => {
       if (data.done) {
         setReenviandoTodos(false);
         setReenvioProgreso(null);
+        if (data.error) {
+          setReenvioError(data.error);
+        } else if (data.saltados && data.saltados.length > 0) {
+          setReenvioSaltados(data.saltados);
+        }
         loadEnviosActivo();
       } else {
         setReenvioProgreso({ enviado: data.enviado ?? 0, total: data.total ?? 0 });
@@ -146,6 +153,13 @@ export default function NuevoEnvioPage() {
       )}
 
       {reenvioError && <p className="text-sm text-destructive">{reenvioError}</p>}
+
+      {reenvioSaltados.length > 0 && (
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+          {reenvioSaltados.length} envío{reenvioSaltados.length === 1 ? "" : "s"} no se pudo reenviar:{" "}
+          {reenvioSaltados.map((s) => s.motivo).join(" · ")}
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
