@@ -57,6 +57,20 @@ def test_get_maestro(client, auth_headers):
     assert isinstance(r.json(), list)
 
 
+def test_get_maestro_ordena_por_clave_union_ascendente(client, auth_headers, db):
+    from app.models.cliente_maestro import ClienteMaestro
+    db.add(ClienteMaestro(clave_union="00000050", nombre="Zeta", email="zeta@mail.com"))
+    db.add(ClienteMaestro(clave_union="00000005", nombre="Alfa", email="alfa@mail.com"))
+    db.add(ClienteMaestro(clave_union="00000099", nombre="Beta", email="beta@mail.com"))
+    db.commit()
+
+    r = client.get("/maestro", headers=auth_headers)
+    assert r.status_code == 200
+    claves = [c["clave_union"] for c in r.json()]
+    posiciones = [claves.index(k) for k in ("00000005", "00000050", "00000099")]
+    assert posiciones == sorted(posiciones)
+
+
 def test_update_cliente_email_y_nombre(client, auth_headers, db):
     from app.models.cliente_maestro import ClienteMaestro
     cliente = ClienteMaestro(clave_union="C010", nombre="Viejo Nombre", email="viejo@mail.com")

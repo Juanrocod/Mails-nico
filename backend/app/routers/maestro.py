@@ -39,7 +39,7 @@ def get_maestro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.query(ClienteMaestro).order_by(ClienteMaestro.nombre).all()
+    return db.query(ClienteMaestro).order_by(ClienteMaestro.clave_union).all()
 
 
 @router.post("", response_model=ClienteMaestroSchema, status_code=201)
