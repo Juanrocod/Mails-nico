@@ -14,7 +14,13 @@ export async function previewCiclo(file: File): Promise<PreviewCiclo> {
 
 export function confirmarCiclo(
   file: File,
-  onProgress: (data: { enviado: number; total: number; id?: string; done?: boolean }) => void,
+  onProgress: (data: {
+    enviado: number;
+    total: number;
+    id?: string;
+    done?: boolean;
+    error?: string;
+  }) => void,
 ): () => void {
   const form = new FormData();
   form.append("file", file);
@@ -26,26 +32,33 @@ export function confirmarCiclo(
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal: controller.signal,
-  }).then(async (r) => {
-    if (!r.ok || !r.body) return;
-    const reader = r.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            onProgress(JSON.parse(line.slice(6)));
-          } catch {}
+  })
+    .then(async (r) => {
+      if (!r.ok || !r.body) {
+        onProgress({ enviado: 0, total: 0, done: true, error: "Error al confirmar el envío" });
+        return;
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              onProgress(JSON.parse(line.slice(6)));
+            } catch {}
+          }
         }
       }
-    }
-  });
+    })
+    .catch(() => {
+      onProgress({ enviado: 0, total: 0, done: true, error: "Error al confirmar el envío" });
+    });
 
   return () => controller.abort();
 }

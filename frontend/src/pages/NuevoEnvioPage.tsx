@@ -35,6 +35,7 @@ export default function NuevoEnvioPage() {
     confirmarPreview,
     isLoading,
     progreso,
+    confirmError,
     loadEnviosActivo,
   } = useCicloContext();
   const [initialLoading, setInitialLoading] = useState(true);
@@ -145,6 +146,8 @@ export default function NuevoEnvioPage() {
           <ProgresoEnvio enviado={progreso.enviado} total={progreso.total} />
         </div>
       )}
+
+      {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
 
       {reenvioProgreso && reenviandoTodos && (
         <div className="rounded-md border border-border bg-secondary/60 p-4">

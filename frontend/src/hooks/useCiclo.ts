@@ -8,6 +8,7 @@ export function useCiclo() {
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progreso, setProgreso] = useState<{ enviado: number; total: number } | null>(null);
+  const [confirmError, setConfirmError] = useState("");
 
   const loadEnviosActivo = useCallback(async () => {
     const data = await getEnviosActivo();
@@ -35,9 +36,12 @@ export function useCiclo() {
     async (file: File, onDone?: () => void) => {
       setIsLoading(true);
       setProgreso({ enviado: 0, total: 0 });
+      setConfirmError("");
       const cancel = confirmarCiclo(file, (data) => {
         if (data.done) {
           setIsLoading(false);
+          setProgreso(null);
+          if (data.error) setConfirmError(data.error);
           loadEnviosActivo();
           onDone?.();
         } else {
@@ -69,6 +73,7 @@ export function useCiclo() {
     confirmarPreview,
     isLoading,
     progreso,
+    confirmError,
     loadEnviosActivo,
   };
 }
