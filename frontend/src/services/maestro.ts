@@ -17,7 +17,7 @@ export async function getMaestro(): Promise<ClienteMaestro[]> {
 
 export async function updateCliente(
   id: string,
-  data: Partial<Pick<ClienteMaestro, "nombre" | "email" | "localidad" | "prefiere_no_recibir_email">>
+  data: Partial<Pick<ClienteMaestro, "nombre" | "email" | "localidad" | "prefiere_no_recibir_email" | "activo">>
 ): Promise<ClienteMaestro> {
   const r = await apiFetch(`/maestro/${id}`, {
     method: "PUT",
@@ -30,6 +30,27 @@ export async function updateCliente(
       ? err.detail.map((d: { msg?: string }) => d.msg).join("; ")
       : err.detail;
     throw new Error(detail ?? "Error guardando el cliente");
+  }
+  return r.json();
+}
+
+export async function createCliente(data: {
+  clave_union: string;
+  nombre: string;
+  email?: string;
+  localidad?: string;
+}): Promise<ClienteMaestro> {
+  const r = await apiFetch("/maestro", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d: { msg?: string }) => d.msg).join("; ")
+      : err.detail;
+    throw new Error(detail ?? "Error creando el cliente");
   }
   return r.json();
 }
