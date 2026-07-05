@@ -92,6 +92,18 @@ def auth_headers(client, test_user):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
+@pytest.fixture(autouse=True)
+def _reset_smtp_rate_limiter():
+    """El rate limiter de smtp_sender es estado de proceso compartido entre
+    llamadas (a proposito, para que el envio masivo y los reenvios individuales
+    respeten el mismo limite) — hay que resetearlo entre tests para que no
+    se contaminen entre si."""
+    from app.services import smtp_sender
+    smtp_sender._send_timestamps.clear()
+    yield
+    smtp_sender._send_timestamps.clear()
+
+
 @pytest.fixture
 def plantilla_default(db):
     from datetime import datetime, timezone

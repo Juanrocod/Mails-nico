@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch, getAccessToken } from "./api";
 import type { Envio, PreviewCiclo } from "../types/domain";
 
 export async function previewCiclo(file: File): Promise<PreviewCiclo> {
@@ -24,7 +24,7 @@ export function confirmarCiclo(
 ): () => void {
   const form = new FormData();
   form.append("file", file);
-  const token = localStorage.getItem("access_token");
+  const token = getAccessToken();
   const controller = new AbortController();
 
   fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:8000"}/ciclos/confirmar`, {
@@ -88,7 +88,7 @@ export function reenviarFallidos(
     error?: string;
   }) => void,
 ): () => void {
-  const token = localStorage.getItem("access_token");
+  const token = getAccessToken();
   const controller = new AbortController();
 
   fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:8000"}/ciclos/activo/reenviar-fallidos`, {

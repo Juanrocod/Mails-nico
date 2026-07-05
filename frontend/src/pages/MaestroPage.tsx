@@ -89,7 +89,9 @@ export default function MaestroPage() {
   }
 
   function handleClienteCreado(cliente: ClienteMaestro) {
-    setClientes((prev) => [...prev, cliente]);
+    setClientes((prev) =>
+      [...prev, cliente].sort((a, b) => a.clave_union.localeCompare(b.clave_union)),
+    );
   }
 
   const clientesVisibles = clientes.filter((c) => c.activo !== mostrarInactivos);

@@ -2,10 +2,12 @@ import asyncio
 import logging
 import smtplib
 import ssl
+import time
 import traceback
 import uuid
+from collections import deque
 from datetime import datetime, timezone
-from typing import Awaitable, Callable, Optional, Tuple
+from typing import Awaitable, Callable, Deque, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,24 @@ _logger = logging.getLogger("mails_nico.smtp")
 
 _DEFAULT_RATE_LIMIT: Tuple[int, float] = (5, 30.0)  # 5 mails, luego esperar 30 segundos
 _SMTP_TIMEOUT_SECONDS = 15  # evita que una conexion/login colgado trabe todo el ciclo
+
+# Estado a nivel de proceso (no por-invocacion): comparte el rate limit entre
+# el envio masivo y los reenvios individuales, para que clicks sucesivos de
+# "Reenviar" no lo salteen enviando cada uno con su propio contador en cero.
+_send_timestamps: "Deque[float]" = deque()
+_rate_limit_lock = asyncio.Lock()
+
+
+async def _esperar_turno_rate_limit(batch_size: int, window_seconds: float) -> None:
+    async with _rate_limit_lock:
+        now = time.monotonic()
+        while _send_timestamps and now - _send_timestamps[0] >= window_seconds:
+            _send_timestamps.popleft()
+        if len(_send_timestamps) >= batch_size:
+            _logger.info("Rate limit: esperando %.1f segundos", window_seconds)
+            await asyncio.sleep(window_seconds)
+            _send_timestamps.clear()
+        _send_timestamps.append(time.monotonic())
 
 
 def _send_single_email(msg, from_email: str, app_password: str, smtp_host: str, smtp_port: int) -> str:
@@ -43,20 +63,18 @@ async def enviar_ciclo(
         batch_size, batch_wait = rate_limit_override or _DEFAULT_RATE_LIMIT
         provider = PROVIDERS[config_service.get_active_provider(db)]
         from_email, app_password = config_service.get_active_credentials(db)
-    except Exception:
+    except Exception as exc:
         _logger.error(
             "No se pudo preparar el envio (plantilla/proveedor/credenciales)\n%s", traceback.format_exc()
         )
-        return
+        raise RuntimeError(
+            "No se pudo enviar: revisá la plantilla y las credenciales del proveedor de email en Configuración."
+        ) from exc
 
-    sent_in_batch = 0
     loop = asyncio.get_running_loop()
 
     for envio in envios:
-        if sent_in_batch >= batch_size:
-            _logger.info("Rate limit: esperando %.1f segundos", batch_wait)
-            await asyncio.sleep(batch_wait)
-            sent_in_batch = 0
+        await _esperar_turno_rate_limit(batch_size, batch_wait)
 
         try:
             parsed = EnvioParsed(
@@ -85,7 +103,6 @@ async def enviar_ciclo(
             envio.enviado_en = datetime.now(timezone.utc)
             db.add(envio)
             db.commit()
-            sent_in_batch += 1
             await on_progress(envio)
             _logger.info("Enviado a %s (message_id=%s)", envio.email, envio.message_id)
         except Exception:

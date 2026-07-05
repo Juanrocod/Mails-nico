@@ -156,6 +156,32 @@ def test_confirmar_ciclo(client, auth_headers, db, plantilla_default):
     db.commit()
 
 
+def test_confirmar_ciclo_informa_error_si_falla_el_envio(client, auth_headers, db, plantilla_default):
+    """Si enviar_ciclo falla al preparar el envio (plantilla/proveedor/credenciales),
+    el SSE final debe incluir 'error' en vez de reportar 'done' como si se
+    hubiese enviado todo bien."""
+    from unittest.mock import patch
+
+    _seed_cliente(db, "C150", "Consorcio Ciento Cincuenta", "cientocincuenta@confirmar.com")
+    excel = _make_deudores_excel([
+        ["C150", "Consorcio Ciento Cincuenta", "CABA", 5000],
+    ])
+
+    with patch("app.services.smtp_sender.config_service.get_active_credentials", side_effect=RuntimeError("boom")):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", excel,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+
+    assert r.status_code == 200
+    assert '"error"' in r.text
+
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C150").delete(synchronize_session=False)
+    db.commit()
+
+
 def test_reenviar_envio_no_elegible_400(client, auth_headers, db, plantilla_default):
     from datetime import datetime, timezone
     from app.models.ciclo import Ciclo

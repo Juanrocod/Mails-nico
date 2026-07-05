@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -15,7 +14,7 @@ from app.schemas.maestro import (
     MaestroUploadResponse,
 )
 from app.services.excel_parser import parse_maestro, ExcelParseError
-from app.services.maestro_service import merge_maestro
+from app.services.maestro_service import merge_maestro, crear_cliente_manual
 
 router = APIRouter(prefix="/maestro", tags=["maestro"])
 
@@ -48,28 +47,10 @@ def crear_cliente(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    existing = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == payload.clave_union).first()
-    if existing:
-        if existing.activo:
-            detail = f"Ya existe un cliente activo con la clave '{payload.clave_union}'."
-        else:
-            detail = (
-                f"Ya existe un cliente con la clave '{payload.clave_union}', pero está inactivo. "
-                "Reactivalo en vez de crear uno nuevo."
-            )
-        raise HTTPException(status_code=409, detail=detail)
-
-    cliente = ClienteMaestro(
-        clave_union=payload.clave_union,
-        nombre=payload.nombre,
-        email=(payload.email or "").strip() or None,
-        localidad=(payload.localidad or "").strip() or None,
-        actualizado_en=datetime.now(timezone.utc),
-    )
-    db.add(cliente)
-    db.commit()
-    db.refresh(cliente)
-    return cliente
+    try:
+        return crear_cliente_manual(db, payload.clave_union, payload.nombre, payload.email, payload.localidad)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.put("/{cliente_id}", response_model=ClienteMaestroSchema)

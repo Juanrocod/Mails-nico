@@ -16,7 +16,7 @@ from app.models.user import User
 from app.schemas.ciclo import PreviewItem, PreviewResponse
 from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
-from app.services.excel_joiner import join_deudores, revalidar_para_reenvio
+from app.services.excel_joiner import join_deudores, revalidar_para_reenvio, revalidar_lote_para_reenvio
 from app.services.excel_parser import parse_deudores, ExcelParseError
 from app.services.smtp_sender import enviar_ciclo
 
@@ -146,10 +146,16 @@ async def confirmar_ciclo(
         db.refresh(e)
 
     async def event_generator():
-        async for chunk in _stream_envios(envios_db, db):
-            yield chunk
-        total = len(envios_db)
-        yield f"data: {json.dumps({'done': True, 'total': total})}\n\n"
+        error = None
+        try:
+            async for chunk in _stream_envios(envios_db, db):
+                yield chunk
+        except Exception as exc:
+            error = str(exc)
+        payload = {"done": True, "total": len(envios_db)}
+        if error:
+            payload["error"] = error
+        yield f"data: {json.dumps(payload)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -234,7 +240,10 @@ async def reenviar_envio(
     async def _noop(_envio: Envio) -> None:
         pass
 
-    await enviar_ciclo([envio], db, _noop)
+    try:
+        await enviar_ciclo([envio], db, _noop)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
     db.refresh(envio)
     if not envio.message_id:
         raise HTTPException(
@@ -263,19 +272,18 @@ async def reenviar_fallidos(
         .all()
     )
 
-    listos: list[Envio] = []
-    saltados: list[dict] = []
-    for envio in fallidos:
-        ok, motivo = revalidar_para_reenvio(db, envio)
-        if ok:
-            listos.append(envio)
-        else:
-            saltados.append({"id": str(envio.id), "motivo": motivo})
+    listos, saltados = revalidar_lote_para_reenvio(db, fallidos)
 
     async def event_generator():
-        async for chunk in _stream_envios(listos, db):
-            yield chunk
-        total = len(listos)
-        yield f"data: {json.dumps({'done': True, 'total': total, 'saltados': saltados})}\n\n"
+        error = None
+        try:
+            async for chunk in _stream_envios(listos, db):
+                yield chunk
+        except Exception as exc:
+            error = str(exc)
+        payload = {"done": True, "total": len(listos), "saltados": saltados}
+        if error:
+            payload["error"] = error
+        yield f"data: {json.dumps(payload)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

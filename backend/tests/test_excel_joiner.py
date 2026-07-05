@@ -195,3 +195,41 @@ def test_revalidar_para_reenvio_valido_actualiza_datos(db):
     assert motivo is None
     assert envio.email == "corregido@mail.com"
     assert envio.nombre_consorcio == "Consorcio Corregido"
+
+
+def test_revalidar_lote_para_reenvio_particiona_listos_y_saltados(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.services.excel_joiner import revalidar_lote_para_reenvio
+
+    _add_cliente(db, "C040", "Consorcio Valido", email="valido@mail.com")
+    _add_cliente(db, "C041", "Consorcio Baja", email="baja@mail.com", baja=True)
+
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    envio_ok = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C040", nombre_consorcio="Nombre Viejo",
+        email="viejo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    envio_baja = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C041", nombre_consorcio="Consorcio Baja",
+        email="baja@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    envio_sin_maestro = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C042", nombre_consorcio="Sin Maestro",
+        email="x@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add_all([envio_ok, envio_baja, envio_sin_maestro])
+    db.flush()
+
+    listos, saltados = revalidar_lote_para_reenvio(db, [envio_ok, envio_baja, envio_sin_maestro])
+
+    assert listos == [envio_ok]
+    assert envio_ok.email == "valido@mail.com"
+    assert envio_ok.nombre_consorcio == "Consorcio Valido"
+    assert {s["id"] for s in saltados} == {str(envio_baja.id), str(envio_sin_maestro.id)}

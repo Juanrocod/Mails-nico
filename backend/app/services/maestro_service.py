@@ -36,3 +36,36 @@ def merge_maestro(db: Session, rows: list[MaestroRow]) -> dict:
     db.commit()
     total = db.query(ClienteMaestro).count()
     return {"nuevos": nuevos, "actualizados": actualizados, "total": total}
+
+
+def crear_cliente_manual(
+    db: Session,
+    clave_union: str,
+    nombre: str,
+    email: str | None,
+    localidad: str | None,
+) -> ClienteMaestro:
+    """
+    Crea un cliente manualmente en el Maestro. Lanza ValueError con el mensaje
+    a mostrar si ya existe un cliente (activo o inactivo) con esa clave_union.
+    """
+    existing = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == clave_union).first()
+    if existing:
+        if existing.activo:
+            raise ValueError(f"Ya existe un cliente activo con la clave '{clave_union}'.")
+        raise ValueError(
+            f"Ya existe un cliente con la clave '{clave_union}', pero está inactivo. "
+            "Reactivalo en vez de crear uno nuevo."
+        )
+
+    cliente = ClienteMaestro(
+        clave_union=clave_union,
+        nombre=nombre,
+        email=(email or "").strip() or None,
+        localidad=(localidad or "").strip() or None,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(cliente)
+    db.commit()
+    db.refresh(cliente)
+    return cliente

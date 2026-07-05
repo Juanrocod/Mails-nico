@@ -119,6 +119,7 @@ def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_
     db.add(Envio(
         ciclo_id=ciclo.id, ciclo_numero=1, clave_union="CNT-PEND-1", nombre_consorcio="Cons",
         email="cnt1@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        message_id="<cnt1@yahoo.com>", enviado_en=datetime.now(timezone.utc),
         actualizado_en=datetime.now(timezone.utc),
     ))
     db.add(Envio(
@@ -131,6 +132,44 @@ def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_
     r = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["count"] == baseline + 1
+
+    # Este Envio queda con message_id + NO_CONTESTADO en el DB compartido en
+    # memoria, lo que lo haria "activo" para el imap_watcher. Limpiar para no
+    # afectar otros tests (ver comentario analogo en test_ciclos.py).
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_get_envios_no_contestados_count_ignora_envios_nunca_enviados(client, auth_headers, db):
+    """Un Envio NO_CONTESTADO sin message_id nunca se llego a mandar (fallo de
+    envio), asi que un cambio de proveedor no lo afecta y no debe contarse
+    en el aviso de 'envios pendientes'."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    baseline = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers).json()["count"]
+
+    ciclo = Ciclo(numero=2, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=2, clave_union="CNT-FALLO-1", nombre_consorcio="Cons",
+        email="cntfallo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    r = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["count"] == baseline
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
 
 
 def test_get_envios_no_contestados_count_requiere_auth(client):

@@ -86,5 +86,9 @@ def get_envios_no_contestados_count(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    count = db.query(Envio).filter(Envio.estado == EstadoEnvio.NO_CONTESTADO).count()
+    count = (
+        db.query(Envio)
+        .filter(Envio.estado == EstadoEnvio.NO_CONTESTADO, Envio.message_id.isnot(None))
+        .count()
+    )
     return ConfiguracionEnviosPendientesResponse(count=count)

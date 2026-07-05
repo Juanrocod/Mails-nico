@@ -77,6 +77,18 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
     return PreviewData(para_enviar=para_enviar, sin_email=sin_email, filtrados=filtrados)
 
 
+def _motivo_invalido_para_reenvio(cliente: Optional[ClienteMaestro]) -> Optional[str]:
+    if cliente is None:
+        return "El cliente ya no existe en el Maestro."
+    if cliente.prefiere_no_recibir_email:
+        return "El cliente está dado de baja."
+    if not cliente.activo:
+        return "El cliente está inactivo en el Maestro."
+    if not cliente.email or not is_valid_email(cliente.email):
+        return "El cliente no tiene un email válido en el Maestro."
+    return None
+
+
 def revalidar_para_reenvio(db: Session, envio: Envio) -> tuple[bool, Optional[str]]:
     """
     Vuelve a validar un Envio contra el Maestro de Clientes antes de reenviarlo.
@@ -85,15 +97,37 @@ def revalidar_para_reenvio(db: Session, envio: Envio) -> tuple[bool, Optional[st
     valido, no toca el envio y devuelve (False, "<motivo>").
     """
     cliente = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == envio.clave_union).first()
-    if cliente is None:
-        return False, "El cliente ya no existe en el Maestro."
-    if cliente.prefiere_no_recibir_email:
-        return False, "El cliente está dado de baja."
-    if not cliente.activo:
-        return False, "El cliente está inactivo en el Maestro."
-    if not cliente.email or not is_valid_email(cliente.email):
-        return False, "El cliente no tiene un email válido en el Maestro."
+    motivo = _motivo_invalido_para_reenvio(cliente)
+    if motivo:
+        return False, motivo
 
     envio.email = cliente.email
     envio.nombre_consorcio = cliente.nombre
     return True, None
+
+
+def revalidar_lote_para_reenvio(db: Session, envios: list[Envio]) -> tuple[list[Envio], list[dict]]:
+    """
+    Version en lote de revalidar_para_reenvio: una sola consulta al Maestro
+    para todas las claves en vez de una por Envio, para no bloquear el event
+    loop con N consultas secuenciales cuando se reenvian muchos fallidos.
+    """
+    claves = [e.clave_union for e in envios]
+    clientes = {
+        c.clave_union: c
+        for c in db.query(ClienteMaestro).filter(ClienteMaestro.clave_union.in_(claves)).all()
+    }
+
+    listos: list[Envio] = []
+    saltados: list[dict] = []
+    for envio in envios:
+        cliente = clientes.get(envio.clave_union)
+        motivo = _motivo_invalido_para_reenvio(cliente)
+        if motivo:
+            saltados.append({"id": str(envio.id), "motivo": motivo})
+            continue
+        envio.email = cliente.email
+        envio.nombre_consorcio = cliente.nombre
+        listos.append(envio)
+
+    return listos, saltados
