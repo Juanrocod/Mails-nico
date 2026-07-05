@@ -55,7 +55,7 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
         if cliente is None:
             sin_email.append(deudor)
             continue
-        if cliente.prefiere_no_recibir_email:
+        if cliente.prefiere_no_recibir_email or not cliente.activo:
             filtrados.append((deudor, "DADO_DE_BAJA"))
             continue
         if deudor.monto < monto_minimo:

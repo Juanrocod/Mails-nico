@@ -65,3 +65,16 @@ def test_join_email_valido_pasa_a_para_enviar(db):
     preview = join_deudores(db, deudores, monto_minimo=Decimal("0"))
     assert len(preview.para_enviar) == 1
     assert len(preview.sin_email) == 0
+
+
+def test_join_filtrado_por_inactivo(db):
+    _add_cliente(db, "C005", "Consorcio Inactivo", email="inactivo@mail.com")
+    cliente = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C005").first()
+    cliente.activo = False
+    db.flush()
+
+    deudores = [DeudorRow("C005", "Consorcio Inactivo", "CABA", Decimal("9000"))]
+    preview = join_deudores(db, deudores, monto_minimo=Decimal("0"))
+    assert len(preview.filtrados) == 1
+    assert preview.filtrados[0][1] == "DADO_DE_BAJA"
+    assert len(preview.para_enviar) == 0
