@@ -41,7 +41,7 @@ export default function SeguimientoPage() {
     navigate(paths[value] ?? "/seguimiento/no-contestados");
   }
 
-  const noContestados = envios.filter((e) => e.estado === "NO_CONTESTADO");
+  const noContestados = envios.filter((e) => e.estado === "NO_CONTESTADO" && e.message_id);
   const contestados = envios.filter((e) => e.estado === "CONTESTADO");
   const pagos = envios.filter((e) => e.estado === "PAGO");
   const rebotados = envios.filter((e) => e.estado === "REBOTADO");
