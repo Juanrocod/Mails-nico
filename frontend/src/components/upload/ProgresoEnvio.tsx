@@ -1,6 +1,19 @@
+import { CheckCircle2 } from "lucide-react";
+
 interface ProgresoEnvioProps {
   enviado: number;
   total: number;
+}
+
+export function EnvioCompletado({ total }: { total: number }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-success px-3 py-2 text-sm text-success-foreground">
+      <CheckCircle2 className="h-4 w-4 shrink-0" />
+      <span>
+        Envío completado — {total} mail{total === 1 ? "" : "s"} enviado{total === 1 ? "" : "s"} correctamente.
+      </span>
+    </div>
+  );
 }
 
 export function ProgresoEnvio({ enviado, total }: ProgresoEnvioProps) {

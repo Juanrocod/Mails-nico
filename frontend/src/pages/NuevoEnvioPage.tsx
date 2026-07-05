@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
-import { ProgresoEnvio } from "../components/upload/ProgresoEnvio";
+import { ProgresoEnvio, EnvioCompletado } from "../components/upload/ProgresoEnvio";
 import { useCicloContext } from "../contexts/useCicloContext";
 import { reenviarEnvio, reenviarFallidos } from "../services/ciclos";
 import type { Envio, MotivoFiltrado } from "../types/domain";
@@ -36,6 +36,9 @@ export default function NuevoEnvioPage() {
     isLoading,
     progreso,
     confirmError,
+    confirmSuccess,
+    confirmTotal,
+    clearConfirmSuccess,
     loadEnviosActivo,
   } = useCicloContext();
   const [initialLoading, setInitialLoading] = useState(true);
@@ -44,6 +47,7 @@ export default function NuevoEnvioPage() {
   const [reenvioProgreso, setReenvioProgreso] = useState<{ enviado: number; total: number } | null>(null);
   const [reenvioError, setReenvioError] = useState("");
   const [reenvioSaltados, setReenvioSaltados] = useState<{ id: string; motivo: string }[]>([]);
+  const [reenvioSuccess, setReenvioSuccess] = useState<number | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -53,6 +57,18 @@ export default function NuevoEnvioPage() {
   useEffect(() => {
     loadEnviosActivo().finally(() => setInitialLoading(false));
   }, [loadEnviosActivo]);
+
+  useEffect(() => {
+    if (!confirmSuccess) return;
+    const t = setTimeout(clearConfirmSuccess, 5000);
+    return () => clearTimeout(t);
+  }, [confirmSuccess, clearConfirmSuccess]);
+
+  useEffect(() => {
+    if (reenvioSuccess === null) return;
+    const t = setTimeout(() => setReenvioSuccess(null), 5000);
+    return () => clearTimeout(t);
+  }, [reenvioSuccess]);
 
   const paraEnviarPreview: TableRow[] = revisando
     ? previewData!.items_para_enviar.map((i) => ({ key: i.clave_union, ...i }))
@@ -97,6 +113,7 @@ export default function NuevoEnvioPage() {
     setReenviandoTodos(true);
     setReenvioError("");
     setReenvioSaltados([]);
+    setReenvioSuccess(null);
     setReenvioProgreso({ enviado: 0, total: 0 });
     reenviarFallidos((data) => {
       if (data.done) {
@@ -104,8 +121,11 @@ export default function NuevoEnvioPage() {
         setReenvioProgreso(null);
         if (data.error) {
           setReenvioError(data.error);
-        } else if (data.saltados && data.saltados.length > 0) {
-          setReenvioSaltados(data.saltados);
+        } else {
+          setReenvioSuccess(data.total ?? 0);
+          if (data.saltados && data.saltados.length > 0) {
+            setReenvioSaltados(data.saltados);
+          }
         }
         loadEnviosActivo();
       } else {
@@ -148,6 +168,7 @@ export default function NuevoEnvioPage() {
       )}
 
       {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
+      {confirmSuccess && <EnvioCompletado total={confirmTotal} />}
 
       {reenvioProgreso && reenviandoTodos && (
         <div className="rounded-md border border-border bg-secondary/60 p-4">
@@ -156,6 +177,7 @@ export default function NuevoEnvioPage() {
       )}
 
       {reenvioError && <p className="text-sm text-destructive">{reenvioError}</p>}
+      {reenvioSuccess !== null && <EnvioCompletado total={reenvioSuccess} />}
 
       {reenvioSaltados.length > 0 && (
         <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
