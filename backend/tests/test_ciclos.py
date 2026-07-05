@@ -156,6 +156,58 @@ def test_confirmar_ciclo(client, auth_headers, db, plantilla_default):
     db.commit()
 
 
+def test_confirmar_ciclo_informa_enviados_reales_no_solo_intentados(client, auth_headers, db, plantilla_default):
+    """Si uno de los envios falla en el momento de mandarse (el per-item
+    try/except de enviar_ciclo lo traga y sigue con el resto), el 'done'
+    final tiene que reportar cuantos se mandaron de verdad -- no el total
+    intentado -- para que el aviso de "envio completado" no mienta."""
+    import json
+    from unittest.mock import patch
+
+    _seed_cliente(db, "C160", "Consorcio Ciento Sesenta", "ok@confirmar.com")
+    _seed_cliente(db, "C161", "Consorcio Ciento Sesenta y Uno", "falla@confirmar.com")
+
+    excel = _make_deudores_excel([
+        ["C160", "Consorcio Ciento Sesenta", "CABA", 5000],
+        ["C161", "Consorcio Ciento Sesenta y Uno", "CABA", 5000],
+    ])
+
+    def _send_side_effect(msg, *_args, **_kwargs):
+        if msg["To"] == "falla@confirmar.com":
+            raise OSError("Network is unreachable")
+        return "<ok@yahoo.com>"
+
+    with patch("app.services.smtp_sender._send_single_email", side_effect=_send_side_effect):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", excel,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+
+    assert r.status_code == 200
+    lines = [line for line in r.text.splitlines() if line.startswith("data: ")]
+    done_payload = json.loads(lines[-1][len("data: "):])
+    assert done_payload["total"] == 2
+    assert done_payload["enviados"] == 1
+    assert "error" not in done_payload
+
+    # C160 se mando de verdad (message_id real + NO_CONTESTADO): limpiar como en
+    # test_reenviar_envio_exitoso para que no quede "activo" para el imap_watcher.
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio
+
+    db.expire_all()
+    ciclo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    db.query(Envio).filter(Envio.clave_union.in_(["C160", "C161"])).delete(synchronize_session=False)
+    if ciclo is not None:
+        db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(
+        ClienteMaestro.clave_union.in_(["C160", "C161"])
+    ).delete(synchronize_session=False)
+    db.commit()
+
+
 def test_confirmar_ciclo_informa_error_si_falla_el_envio(client, auth_headers, db, plantilla_default):
     """Si enviar_ciclo falla al preparar el envio (plantilla/proveedor/credenciales),
     el SSE final debe incluir 'error' en vez de reportar 'done' como si se

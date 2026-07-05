@@ -147,12 +147,13 @@ async def confirmar_ciclo(
 
     async def event_generator():
         error = None
+        resultado: dict = {}
         try:
-            async for chunk in _stream_envios(envios_db, db):
+            async for chunk in _stream_envios(envios_db, db, resultado):
                 yield chunk
         except Exception as exc:
             error = str(exc)
-        payload = {"done": True, "total": len(envios_db)}
+        payload = {"done": True, "total": len(envios_db), "enviados": resultado.get("enviados", 0)}
         if error:
             payload["error"] = error
         yield f"data: {json.dumps(payload)}\n\n"
@@ -160,8 +161,13 @@ async def confirmar_ciclo(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-async def _stream_envios(envios_db: list[Envio], db: Session):
-    """Yields SSE data chunks while enviar_ciclo sends mails in the background."""
+async def _stream_envios(envios_db: list[Envio], db: Session, resultado: dict):
+    """Yields SSE data chunks while enviar_ciclo sends mails in the background.
+
+    `resultado` se completa con la cantidad real de envios exitosos (distinto
+    de len(envios_db), que es la cantidad intentada) para que el caller pueda
+    distinguir un envio parcialmente fallido de uno completo.
+    """
     sent = 0
     total = len(envios_db)
     sse_queue: asyncio.Queue = asyncio.Queue()
@@ -183,6 +189,7 @@ async def _stream_envios(envios_db: list[Envio], db: Session):
 
     # Propagate any exception from the send task
     await send_task
+    resultado["enviados"] = sent
 
 
 @router.post("/ciclos/desde-api")
@@ -276,12 +283,18 @@ async def reenviar_fallidos(
 
     async def event_generator():
         error = None
+        resultado: dict = {}
         try:
-            async for chunk in _stream_envios(listos, db):
+            async for chunk in _stream_envios(listos, db, resultado):
                 yield chunk
         except Exception as exc:
             error = str(exc)
-        payload = {"done": True, "total": len(listos), "saltados": saltados}
+        payload = {
+            "done": True,
+            "total": len(listos),
+            "enviados": resultado.get("enviados", 0),
+            "saltados": saltados,
+        }
         if error:
             payload["error"] = error
         yield f"data: {json.dumps(payload)}\n\n"

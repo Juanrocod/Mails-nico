@@ -17,6 +17,7 @@ export function confirmarCiclo(
   onProgress: (data: {
     enviado: number;
     total: number;
+    enviados?: number;
     id?: string;
     done?: boolean;
     error?: string;
@@ -82,6 +83,7 @@ export function reenviarFallidos(
   onProgress: (data: {
     enviado: number;
     total: number;
+    enviados?: number;
     id?: string;
     done?: boolean;
     saltados?: { id: string; motivo: string }[];

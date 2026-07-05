@@ -38,6 +38,7 @@ export default function NuevoEnvioPage() {
     confirmError,
     confirmSuccess,
     confirmTotal,
+    confirmEnviados,
     clearConfirmSuccess,
     loadEnviosActivo,
   } = useCicloContext();
@@ -47,7 +48,7 @@ export default function NuevoEnvioPage() {
   const [reenvioProgreso, setReenvioProgreso] = useState<{ enviado: number; total: number } | null>(null);
   const [reenvioError, setReenvioError] = useState("");
   const [reenvioSaltados, setReenvioSaltados] = useState<{ id: string; motivo: string }[]>([]);
-  const [reenvioSuccess, setReenvioSuccess] = useState<number | null>(null);
+  const [reenvioSuccess, setReenvioSuccess] = useState<{ enviados: number; total: number } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -122,7 +123,7 @@ export default function NuevoEnvioPage() {
         if (data.error) {
           setReenvioError(data.error);
         } else {
-          setReenvioSuccess(data.total ?? 0);
+          setReenvioSuccess({ enviados: data.enviados ?? data.total ?? 0, total: data.total ?? 0 });
           if (data.saltados && data.saltados.length > 0) {
             setReenvioSaltados(data.saltados);
           }
@@ -168,7 +169,7 @@ export default function NuevoEnvioPage() {
       )}
 
       {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
-      {confirmSuccess && <EnvioCompletado total={confirmTotal} />}
+      {confirmSuccess && <EnvioCompletado enviados={confirmEnviados} total={confirmTotal} />}
 
       {reenvioProgreso && reenviandoTodos && (
         <div className="rounded-md border border-border bg-secondary/60 p-4">
@@ -177,7 +178,9 @@ export default function NuevoEnvioPage() {
       )}
 
       {reenvioError && <p className="text-sm text-destructive">{reenvioError}</p>}
-      {reenvioSuccess !== null && <EnvioCompletado total={reenvioSuccess} />}
+      {reenvioSuccess !== null && (
+        <EnvioCompletado enviados={reenvioSuccess.enviados} total={reenvioSuccess.total} />
+      )}
 
       {reenvioSaltados.length > 0 && (
         <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">

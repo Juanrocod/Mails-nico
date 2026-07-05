@@ -11,6 +11,7 @@ export function useCiclo() {
   const [confirmError, setConfirmError] = useState("");
   const [confirmSuccess, setConfirmSuccess] = useState(false);
   const [confirmTotal, setConfirmTotal] = useState(0);
+  const [confirmEnviados, setConfirmEnviados] = useState(0);
 
   const loadEnviosActivo = useCallback(async () => {
     const data = await getEnviosActivo();
@@ -48,6 +49,7 @@ export function useCiclo() {
             setConfirmError(data.error);
           } else {
             setConfirmTotal(data.total ?? 0);
+            setConfirmEnviados(data.enviados ?? data.total ?? 0);
             setConfirmSuccess(true);
           }
           loadEnviosActivo();
@@ -84,6 +86,7 @@ export function useCiclo() {
     confirmError,
     confirmSuccess,
     confirmTotal,
+    confirmEnviados,
     clearConfirmSuccess: useCallback(() => setConfirmSuccess(false), []),
     loadEnviosActivo,
   };

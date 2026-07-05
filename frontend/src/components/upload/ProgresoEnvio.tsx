@@ -1,16 +1,29 @@
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface ProgresoEnvioProps {
   enviado: number;
   total: number;
 }
 
-export function EnvioCompletado({ total }: { total: number }) {
+export function EnvioCompletado({ enviados, total }: { enviados: number; total: number }) {
+  if (enviados >= total) {
+    return (
+      <div className="flex items-center gap-2 rounded-md bg-success px-3 py-2 text-sm text-success-foreground">
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
+        <span>
+          Envío completado — {total} mail{total === 1 ? "" : "s"} enviado{total === 1 ? "" : "s"} correctamente.
+        </span>
+      </div>
+    );
+  }
+
+  const fallidos = total - enviados;
   return (
-    <div className="flex items-center gap-2 rounded-md bg-success px-3 py-2 text-sm text-success-foreground">
-      <CheckCircle2 className="h-4 w-4 shrink-0" />
+    <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+      <AlertTriangle className="h-4 w-4 shrink-0" />
       <span>
-        Envío completado — {total} mail{total === 1 ? "" : "s"} enviado{total === 1 ? "" : "s"} correctamente.
+        Se enviaron {enviados} de {total} mails. {fallidos} no se pudo{fallidos === 1 ? "" : "n"} mandar — buscalo
+        {fallidos === 1 ? "" : "s"} en "Para enviar" para reintentar.
       </span>
     </div>
   );
