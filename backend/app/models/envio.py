@@ -33,6 +33,7 @@ class Envio(Base):
     estado = Column(Enum(EstadoEnvio), nullable=False, default=EstadoEnvio.NO_CONTESTADO)
     motivo_filtrado = Column(Enum(MotivoFiltrado), nullable=True)
     message_id = Column(String(512), nullable=True, index=True)
+    proveedor = Column(String(20), nullable=True)
     reply_snippet = Column(Text, nullable=True)
     reply_en = Column(DateTime, nullable=True)
     tiene_adjunto = Column(Boolean, nullable=False, default=False)

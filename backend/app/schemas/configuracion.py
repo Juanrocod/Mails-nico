@@ -35,4 +35,6 @@ class ConfiguracionProveedorResponse(BaseModel):
 
 
 class ConfiguracionEnviosPendientesResponse(BaseModel):
-    count: int
+    pendientes_proveedor_activo: int
+    intrackeados_otro_proveedor: int
+    otro_proveedor_email: Optional[str] = None

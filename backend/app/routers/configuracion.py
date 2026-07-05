@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -81,14 +82,39 @@ def put_proveedor(
     return ConfiguracionProveedorResponse(proveedor=body.proveedor)
 
 
-@router.get("/envios-no-contestados-count", response_model=ConfiguracionEnviosPendientesResponse)
-def get_envios_no_contestados_count(
+@router.get("/envios-pendientes", response_model=ConfiguracionEnviosPendientesResponse)
+def get_envios_pendientes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    count = (
-        db.query(Envio)
-        .filter(Envio.estado == EstadoEnvio.NO_CONTESTADO, Envio.message_id.isnot(None))
-        .count()
+    """
+    Envios NO_CONTESTADO con message_id (efectivamente mandados), partidos en:
+    - pendientes_proveedor_activo: se mandaron con el proveedor activo actual
+      (o no tienen proveedor registrado, de antes de que existiera esta
+      columna — se asume que fueron con el activo). Si el operario cambia de
+      proveedor ahora, estos son los que dejan de poder rastrearse.
+    - intrackeados_otro_proveedor: ya se mandaron con el otro proveedor, asi
+      que el watcher IMAP no los puede rastrear mientras ese no sea el activo.
+    """
+    proveedor_activo = config_service.get_active_provider(db)
+    otro_proveedor = "gmail" if proveedor_activo == "yahoo" else "yahoo"
+
+    base = db.query(Envio).filter(
+        Envio.estado == EstadoEnvio.NO_CONTESTADO,
+        Envio.message_id.isnot(None),
     )
-    return ConfiguracionEnviosPendientesResponse(count=count)
+    pendientes_proveedor_activo = base.filter(
+        or_(Envio.proveedor == proveedor_activo, Envio.proveedor.is_(None))
+    ).count()
+    intrackeados_otro_proveedor = base.filter(Envio.proveedor == otro_proveedor).count()
+
+    otro_proveedor_email = None
+    if intrackeados_otro_proveedor > 0:
+        config = config_service.load_config(db)
+        otro_proveedor_email = config.gmail_email if otro_proveedor == "gmail" else config.yahoo_email
+
+    return ConfiguracionEnviosPendientesResponse(
+        pendientes_proveedor_activo=pendientes_proveedor_activo,
+        intrackeados_otro_proveedor=intrackeados_otro_proveedor,
+        otro_proveedor_email=otro_proveedor_email,
+    )

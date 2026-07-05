@@ -104,13 +104,14 @@ def test_get_configuracion_gmail_requiere_auth(client):
     assert r.status_code in (401, 403)
 
 
-def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_headers, db):
+def test_get_envios_pendientes_cuenta_los_del_proveedor_activo(client, auth_headers, db):
     from datetime import datetime, timezone
     from decimal import Decimal
     from app.models.ciclo import Ciclo
     from app.models.envio import Envio, EstadoEnvio
 
-    baseline = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers).json()["count"]
+    baseline = client.get("/configuracion/envios-pendientes", headers=auth_headers).json()
+    proveedor_activo = client.get("/configuracion/proveedor", headers=auth_headers).json()["proveedor"]
 
     ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
     db.add(ciclo)
@@ -119,7 +120,7 @@ def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_
     db.add(Envio(
         ciclo_id=ciclo.id, ciclo_numero=1, clave_union="CNT-PEND-1", nombre_consorcio="Cons",
         email="cnt1@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
-        message_id="<cnt1@yahoo.com>", enviado_en=datetime.now(timezone.utc),
+        message_id="<cnt1@yahoo.com>", enviado_en=datetime.now(timezone.utc), proveedor=proveedor_activo,
         actualizado_en=datetime.now(timezone.utc),
     ))
     db.add(Envio(
@@ -129,9 +130,11 @@ def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_
     ))
     db.commit()
 
-    r = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers)
+    r = client.get("/configuracion/envios-pendientes", headers=auth_headers)
     assert r.status_code == 200
-    assert r.json()["count"] == baseline + 1
+    data = r.json()
+    assert data["pendientes_proveedor_activo"] == baseline["pendientes_proveedor_activo"] + 1
+    assert data["intrackeados_otro_proveedor"] == baseline["intrackeados_otro_proveedor"]
 
     # Este Envio queda con message_id + NO_CONTESTADO en el DB compartido en
     # memoria, lo que lo haria "activo" para el imap_watcher. Limpiar para no
@@ -141,7 +144,92 @@ def test_get_envios_no_contestados_count_refleja_envios_pendientes(client, auth_
     db.commit()
 
 
-def test_get_envios_no_contestados_count_ignora_envios_nunca_enviados(client, auth_headers, db):
+def test_get_envios_pendientes_sin_proveedor_asume_el_activo(client, auth_headers, db):
+    """Envios de antes de que existiera la columna proveedor (NULL) se
+    asumen mandados con el proveedor activo actual."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    baseline = client.get("/configuracion/envios-pendientes", headers=auth_headers).json()
+
+    ciclo = Ciclo(numero=3, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=3, clave_union="CNT-SINPROV-1", nombre_consorcio="Cons",
+        email="sinprov@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        message_id="<sinprov@yahoo.com>", enviado_en=datetime.now(timezone.utc), proveedor=None,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    r = client.get("/configuracion/envios-pendientes", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pendientes_proveedor_activo"] == baseline["pendientes_proveedor_activo"] + 1
+    assert data["intrackeados_otro_proveedor"] == baseline["intrackeados_otro_proveedor"]
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_get_envios_pendientes_cuenta_intrackeados_del_otro_proveedor(client, auth_headers, db):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    r_proveedor = client.get("/configuracion/proveedor", headers=auth_headers)
+    proveedor_activo = r_proveedor.json()["proveedor"]
+    otro_proveedor = "gmail" if proveedor_activo == "yahoo" else "yahoo"
+
+    # La fixture db limpia ConfiguracionSistema entre tests, asi que el otro
+    # proveedor no tiene credenciales cargadas por default: configurarlo para
+    # poder verificar que otro_proveedor_email se resuelve.
+    if otro_proveedor == "gmail":
+        client.put(
+            "/configuracion/gmail",
+            json={"gmail_email": "otroproveedor@gmail.com", "gmail_app_password": "clave-app"},
+            headers=auth_headers,
+        )
+    else:
+        client.put(
+            "/configuracion/yahoo",
+            json={"yahoo_email": "otroproveedor@yahoo.com", "yahoo_app_password": "clave-app"},
+            headers=auth_headers,
+        )
+
+    baseline = client.get("/configuracion/envios-pendientes", headers=auth_headers).json()
+
+    ciclo = Ciclo(numero=4, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=4, clave_union="CNT-OTROPROV-1", nombre_consorcio="Cons",
+        email="otroprov@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        message_id="<otroprov@mail.com>", enviado_en=datetime.now(timezone.utc), proveedor=otro_proveedor,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    r = client.get("/configuracion/envios-pendientes", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["intrackeados_otro_proveedor"] == baseline["intrackeados_otro_proveedor"] + 1
+    assert data["pendientes_proveedor_activo"] == baseline["pendientes_proveedor_activo"]
+    assert data["otro_proveedor_email"] is not None
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_get_envios_pendientes_ignora_envios_nunca_enviados(client, auth_headers, db):
     """Un Envio NO_CONTESTADO sin message_id nunca se llego a mandar (fallo de
     envio), asi que un cambio de proveedor no lo afecta y no debe contarse
     en el aviso de 'envios pendientes'."""
@@ -150,7 +238,7 @@ def test_get_envios_no_contestados_count_ignora_envios_nunca_enviados(client, au
     from app.models.ciclo import Ciclo
     from app.models.envio import Envio, EstadoEnvio
 
-    baseline = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers).json()["count"]
+    baseline = client.get("/configuracion/envios-pendientes", headers=auth_headers).json()
 
     ciclo = Ciclo(numero=2, activo=True, creado_en=datetime.now(timezone.utc))
     db.add(ciclo)
@@ -163,15 +251,17 @@ def test_get_envios_no_contestados_count_ignora_envios_nunca_enviados(client, au
     ))
     db.commit()
 
-    r = client.get("/configuracion/envios-no-contestados-count", headers=auth_headers)
+    r = client.get("/configuracion/envios-pendientes", headers=auth_headers)
     assert r.status_code == 200
-    assert r.json()["count"] == baseline
+    data = r.json()
+    assert data["pendientes_proveedor_activo"] == baseline["pendientes_proveedor_activo"]
+    assert data["intrackeados_otro_proveedor"] == baseline["intrackeados_otro_proveedor"]
 
     db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
     db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
     db.commit()
 
 
-def test_get_envios_no_contestados_count_requiere_auth(client):
-    r = client.get("/configuracion/envios-no-contestados-count")
+def test_get_envios_pendientes_requiere_auth(client):
+    r = client.get("/configuracion/envios-pendientes")
     assert r.status_code in (401, 403)

@@ -82,5 +82,7 @@ export interface ConfiguracionGmail {
 }
 
 export interface ConfiguracionEnviosPendientes {
-  count: number;
+  pendientes_proveedor_activo: number;
+  intrackeados_otro_proveedor: number;
+  otro_proveedor_email: string | null;
 }

@@ -61,7 +61,8 @@ async def enviar_ciclo(
     try:
         plantilla = db_config.load_plantilla(db)
         batch_size, batch_wait = rate_limit_override or _DEFAULT_RATE_LIMIT
-        provider = PROVIDERS[config_service.get_active_provider(db)]
+        proveedor_nombre = config_service.get_active_provider(db)
+        provider = PROVIDERS[proveedor_nombre]
         from_email, app_password = config_service.get_active_credentials(db)
     except Exception as exc:
         _logger.error(
@@ -101,6 +102,7 @@ async def enviar_ciclo(
             )
             envio.message_id = returned_id or msg_id
             envio.enviado_en = datetime.now(timezone.utc)
+            envio.proveedor = proveedor_nombre
             db.add(envio)
             db.commit()
             await on_progress(envio)

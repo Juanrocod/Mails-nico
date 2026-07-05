@@ -90,6 +90,8 @@ def test_enviar_ciclo_usa_host_yahoo_por_default(db, plantilla_default):
     args = mock_send.call_args.args
     assert args[3] == "smtp.mail.yahoo.com"
     assert args[4] == 587
+    db.refresh(envio)
+    assert envio.proveedor == "yahoo"
 
 
 def test_enviar_ciclo_usa_host_gmail_cuando_esta_activo(db, plantilla_default):
@@ -111,6 +113,8 @@ def test_enviar_ciclo_usa_host_gmail_cuando_esta_activo(db, plantilla_default):
     args = mock_send.call_args.args
     assert args[3] == "smtp.gmail.com"
     assert args[4] == 587
+    db.refresh(envio)
+    assert envio.proveedor == "gmail"
 
 
 def test_enviar_ciclo_propaga_error_si_falla_config(db, plantilla_default):

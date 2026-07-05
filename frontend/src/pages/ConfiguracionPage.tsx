@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -8,9 +9,15 @@ import {
   updateConfiguracionGmail,
   getProveedorActivo,
   updateProveedorActivo,
-  getEnviosNoContestadosCount,
+  getEnviosPendientes,
 } from "../services/configuracion";
-import type { ProveedorEmail } from "../types/domain";
+import type { ConfiguracionEnviosPendientes, ProveedorEmail } from "../types/domain";
+
+const DISMISS_KEY = "config_intrackeados_dismissed";
+
+function intrackeadosSignature(data: ConfiguracionEnviosPendientes): string {
+  return `${data.intrackeados_otro_proveedor}:${data.otro_proveedor_email ?? ""}`;
+}
 
 export default function ConfiguracionPage() {
   const [proveedor, setProveedor] = useState<ProveedorEmail>("yahoo");
@@ -26,7 +33,17 @@ export default function ConfiguracionPage() {
   const [gmailConfigurado, setGmailConfigurado] = useState(false);
   const [gmailStatus, setGmailStatus] = useState("");
 
-  const [enviosPendientes, setEnviosPendientes] = useState(0);
+  const [enviosPendientes, setEnviosPendientes] = useState<ConfiguracionEnviosPendientes | null>(null);
+  const [intrackeadosDismissed, setIntrackeadosDismissed] = useState(false);
+
+  function cargarEnviosPendientes() {
+    getEnviosPendientes()
+      .then((data) => {
+        setEnviosPendientes(data);
+        setIntrackeadosDismissed(localStorage.getItem(DISMISS_KEY) === intrackeadosSignature(data));
+      })
+      .catch(() => {});
+  }
 
   useEffect(() => {
     getProveedorActivo()
@@ -44,10 +61,14 @@ export default function ConfiguracionPage() {
         if (data.gmail_email) setGmailEmail(data.gmail_email);
       })
       .catch(() => {});
-    getEnviosNoContestadosCount()
-      .then((data) => setEnviosPendientes(data.count))
-      .catch(() => {});
+    cargarEnviosPendientes();
   }, []);
+
+  function handleDismissIntrackeados() {
+    if (!enviosPendientes) return;
+    localStorage.setItem(DISMISS_KEY, intrackeadosSignature(enviosPendientes));
+    setIntrackeadosDismissed(true);
+  }
 
   async function handleCambiarProveedor(nuevo: ProveedorEmail) {
     setProveedor(nuevo);
@@ -55,6 +76,7 @@ export default function ConfiguracionPage() {
     try {
       await updateProveedorActivo(nuevo);
       setProveedorStatus("Guardado correctamente");
+      cargarEnviosPendientes();
     } catch (e: unknown) {
       setProveedorStatus(e instanceof Error ? e.message : "Error");
     }
@@ -97,10 +119,30 @@ export default function ConfiguracionPage() {
         </div>
       )}
 
-      {enviosPendientes > 0 && (
+      {enviosPendientes && enviosPendientes.pendientes_proveedor_activo > 0 && (
         <div className="max-w-sm rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
-          Hay {enviosPendientes} envío{enviosPendientes === 1 ? "" : "s"} esperando respuesta. Si cambiás de
-          proveedor ahora, el sistema deja de poder detectar esas respuestas.
+          Hay {enviosPendientes.pendientes_proveedor_activo} envío
+          {enviosPendientes.pendientes_proveedor_activo === 1 ? "" : "s"} esperando respuesta con este proveedor.
+          Si cambiás de proveedor ahora, el sistema deja de poder detectar esas respuestas.
+        </div>
+      )}
+
+      {enviosPendientes && enviosPendientes.intrackeados_otro_proveedor > 0 && !intrackeadosDismissed && (
+        <div className="max-w-sm flex items-start justify-between gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+          <span>
+            {enviosPendientes.intrackeados_otro_proveedor} envío
+            {enviosPendientes.intrackeados_otro_proveedor === 1 ? "" : "s"} sin poder rastrearse
+            {enviosPendientes.otro_proveedor_email ? ` (se mandaron desde ${enviosPendientes.otro_proveedor_email})` : ""}.
+            Volvé a activar ese proveedor si querés seguir el seguimiento.
+          </span>
+          <button
+            type="button"
+            onClick={handleDismissIntrackeados}
+            aria-label="Cerrar aviso"
+            className="shrink-0 text-warning-text/70 hover:text-warning-text"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 

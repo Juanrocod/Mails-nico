@@ -70,8 +70,8 @@ export async function updateProveedorActivo(proveedor: ProveedorEmail): Promise<
   return r.json();
 }
 
-export async function getEnviosNoContestadosCount(): Promise<ConfiguracionEnviosPendientes> {
-  const r = await apiFetch("/configuracion/envios-no-contestados-count");
+export async function getEnviosPendientes(): Promise<ConfiguracionEnviosPendientes> {
+  const r = await apiFetch("/configuracion/envios-pendientes");
   if (!r.ok) throw new Error("Error cargando envios pendientes");
   return r.json();
 }
