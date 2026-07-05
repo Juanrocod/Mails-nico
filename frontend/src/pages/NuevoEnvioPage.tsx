@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Send, MailX, Filter } from "lucide-react";
+import { Send, MailX, Filter, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { ProgresoEnvio } from "../components/upload/ProgresoEnvio";
 import { useCicloContext } from "../contexts/useCicloContext";
-import type { MotivoFiltrado } from "../types/domain";
+import { reenviarEnvio, reenviarFallidos } from "../services/ciclos";
+import type { Envio, MotivoFiltrado } from "../types/domain";
 import { cn } from "../lib/utils";
 import { MOTIVO_LABEL, MOTIVO_DOT } from "../lib/estado";
 
 const PATH_TO_TAB: Record<string, string> = {
   "/nuevo-envio/para-enviar": "para_enviar",
+  "/nuevo-envio/enviados": "enviados",
   "/nuevo-envio/sin-email": "sin_email",
   "/nuevo-envio/filtrados": "filtrados",
 };
@@ -36,6 +38,10 @@ export default function NuevoEnvioPage() {
     loadEnviosActivo,
   } = useCicloContext();
   const [initialLoading, setInitialLoading] = useState(true);
+  const [reenviandoId, setReenviandoId] = useState<string | null>(null);
+  const [reenviandoTodos, setReenviandoTodos] = useState(false);
+  const [reenvioProgreso, setReenvioProgreso] = useState<{ enviado: number; total: number } | null>(null);
+  const [reenvioError, setReenvioError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -46,11 +52,13 @@ export default function NuevoEnvioPage() {
     loadEnviosActivo().finally(() => setInitialLoading(false));
   }, [loadEnviosActivo]);
 
-  const paraEnviar: TableRow[] = revisando
+  const paraEnviarPreview: TableRow[] = revisando
     ? previewData!.items_para_enviar.map((i) => ({ key: i.clave_union, ...i }))
-    : enviosActivo
-        .filter((e) => e.estado === "NO_CONTESTADO" && e.email)
-        .map((e) => ({ key: e.id, ...e }));
+    : [];
+  const fallidos: Envio[] = !revisando
+    ? enviosActivo.filter((e) => e.estado === "NO_CONTESTADO" && e.email && !e.message_id)
+    : [];
+  const enviados: Envio[] = enviosActivo.filter((e) => e.message_id);
   const sinEmail: TableRow[] = revisando
     ? previewData!.items_sin_email.map((i) => ({ key: i.clave_union, ...i }))
     : enviosActivo.filter((e) => e.estado === "SIN_EMAIL").map((e) => ({ key: e.id, ...e }));
@@ -58,13 +66,44 @@ export default function NuevoEnvioPage() {
     ? previewData!.items_filtrados.map((i) => ({ key: i.clave_union, ...i }))
     : enviosActivo.filter((e) => e.estado === "FILTRADO").map((e) => ({ key: e.id, ...e }));
 
+  const paraEnviarCount = revisando ? paraEnviarPreview.length : fallidos.length;
+
   function handleTabChange(value: string) {
     const paths: Record<string, string> = {
       para_enviar: "/nuevo-envio/para-enviar",
+      enviados: "/nuevo-envio/enviados",
       sin_email: "/nuevo-envio/sin-email",
       filtrados: "/nuevo-envio/filtrados",
     };
     navigate(paths[value] ?? "/nuevo-envio/para-enviar");
+  }
+
+  async function handleReenviar(id: string) {
+    setReenviandoId(id);
+    setReenvioError("");
+    try {
+      await reenviarEnvio(id);
+      await loadEnviosActivo();
+    } catch (e: unknown) {
+      setReenvioError(e instanceof Error ? e.message : "Error al reenviar el mail");
+    } finally {
+      setReenviandoId(null);
+    }
+  }
+
+  function handleReenviarTodos() {
+    setReenviandoTodos(true);
+    setReenvioError("");
+    setReenvioProgreso({ enviado: 0, total: 0 });
+    reenviarFallidos((data) => {
+      if (data.done) {
+        setReenviandoTodos(false);
+        setReenvioProgreso(null);
+        loadEnviosActivo();
+      } else {
+        setReenvioProgreso({ enviado: data.enviado ?? 0, total: data.total ?? 0 });
+      }
+    });
   }
 
   return (
@@ -100,14 +139,31 @@ export default function NuevoEnvioPage() {
         </div>
       )}
 
+      {reenvioProgreso && reenviandoTodos && (
+        <div className="rounded-md border border-border bg-secondary/60 p-4">
+          <ProgresoEnvio enviado={reenvioProgreso.enviado} total={reenvioProgreso.total} />
+        </div>
+      )}
+
+      {reenvioError && <p className="text-sm text-destructive">{reenvioError}</p>}
+
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="para_enviar" className="gap-1.5">
             <Send className="h-3.5 w-3.5" />
             Para enviar
-            {paraEnviar.length > 0 && (
+            {paraEnviarCount > 0 && (
               <Badge variant="secondary" className="text-xs tabular-nums">
-                {paraEnviar.length}
+                {paraEnviarCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="enviados" className="gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Enviados
+            {enviados.length > 0 && (
+              <Badge variant="secondary" className="text-xs tabular-nums">
+                {enviados.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -132,16 +188,30 @@ export default function NuevoEnvioPage() {
         </TabsList>
 
         <TabsContent value="para_enviar">
-          <EnvioTable
-            envios={paraEnviar}
-            loading={!revisando && initialLoading}
-            emptyState={
-              <EmptyState
-                title="No hay deudores para enviar"
-                description="Subí el Excel de deudores para armar el próximo ciclo de envío."
-              />
-            }
-          />
+          {revisando ? (
+            <EnvioTable
+              envios={paraEnviarPreview}
+              loading={false}
+              emptyState={
+                <EmptyState
+                  title="No hay deudores para enviar"
+                  description="Subí el Excel de deudores para armar el próximo ciclo de envío."
+                />
+              }
+            />
+          ) : (
+            <FallidosTable
+              envios={fallidos}
+              loading={initialLoading}
+              reenviandoId={reenviandoId}
+              onReenviar={handleReenviar}
+              onReenviarTodos={handleReenviarTodos}
+              reenviandoTodos={reenviandoTodos}
+            />
+          )}
+        </TabsContent>
+        <TabsContent value="enviados">
+          <EnviadosTable envios={enviados} loading={!revisando && initialLoading} />
         </TabsContent>
         <TabsContent value="sin_email">
           <EnvioTable
@@ -254,6 +324,157 @@ function EnvioTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function EnviadosTable({ envios, loading }: { envios: Envio[]; loading?: boolean }) {
+  if (loading) {
+    return (
+      <div className="space-y-2 pt-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-9 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (envios.length === 0) {
+    return (
+      <div className="pt-2">
+        <EmptyState
+          title="Todavía no se mandó ningún mail en este ciclo"
+          description="Confirmá el envío desde Para Enviar para que empiecen a aparecer acá."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm table-fixed">
+        <colgroup>
+          <col className="w-[40%]" />
+          <col className="w-[35%]" />
+          <col className="w-[25%]" />
+        </colgroup>
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Consorcio
+            </th>
+            <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Email
+            </th>
+            <th className="py-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Monto
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {envios.map((e) => (
+            <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/50">
+              <td className="py-2.5 pr-4 text-foreground truncate">{e.nombre_consorcio}</td>
+              <td className="py-2.5 pr-4 text-muted-foreground truncate">{e.email ?? "—"}</td>
+              <td className="py-2.5 text-right tabular-nums text-foreground">
+                ${Number(e.monto).toLocaleString("es-AR")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FallidosTable({
+  envios,
+  loading,
+  reenviandoId,
+  onReenviar,
+  onReenviarTodos,
+  reenviandoTodos,
+}: {
+  envios: Envio[];
+  loading?: boolean;
+  reenviandoId: string | null;
+  onReenviar: (id: string) => void;
+  onReenviarTodos: () => void;
+  reenviandoTodos: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2 pt-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-9 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (envios.length === 0) {
+    return (
+      <div className="pt-2">
+        <EmptyState
+          title="No hay envíos pendientes de reenvío"
+          description="Todo lo de este ciclo se mandó bien, o todavía no confirmaste el envío."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 pt-2">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={onReenviarTodos} disabled={reenviandoTodos}>
+          {reenviandoTodos ? "Reenviando..." : `Reenviar todos (${envios.length})`}
+        </Button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[35%]" />
+            <col className="w-[30%]" />
+            <col className="w-[15%]" />
+            <col className="w-[20%]" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Consorcio
+              </th>
+              <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Email
+              </th>
+              <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Monto
+              </th>
+              <th aria-hidden />
+            </tr>
+          </thead>
+          <tbody>
+            {envios.map((e) => (
+              <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/50">
+                <td className="py-2.5 pr-4 text-foreground truncate">{e.nombre_consorcio}</td>
+                <td className="py-2.5 pr-4 text-muted-foreground truncate">{e.email ?? "—"}</td>
+                <td className="py-2.5 pr-4 text-right tabular-nums text-foreground">
+                  ${Number(e.monto).toLocaleString("es-AR")}
+                </td>
+                <td className="py-2.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={reenviandoId === e.id || reenviandoTodos}
+                    onClick={() => onReenviar(e.id)}
+                  >
+                    {reenviandoId === e.id ? "Reenviando..." : "Reenviar"}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
