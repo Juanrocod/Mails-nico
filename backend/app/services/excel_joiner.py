@@ -75,3 +75,25 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
         ))
 
     return PreviewData(para_enviar=para_enviar, sin_email=sin_email, filtrados=filtrados)
+
+
+def revalidar_para_reenvio(db: Session, envio: Envio) -> tuple[bool, Optional[str]]:
+    """
+    Vuelve a validar un Envio contra el Maestro de Clientes antes de reenviarlo.
+    Si es valido, actualiza envio.email y envio.nombre_consorcio con los datos
+    actuales del Maestro (sin commitear) y devuelve (True, None). Si no es
+    valido, no toca el envio y devuelve (False, "<motivo>").
+    """
+    cliente = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == envio.clave_union).first()
+    if cliente is None:
+        return False, "El cliente ya no existe en el Maestro."
+    if cliente.prefiere_no_recibir_email:
+        return False, "El cliente está dado de baja."
+    if not cliente.activo:
+        return False, "El cliente está inactivo en el Maestro."
+    if not cliente.email or not is_valid_email(cliente.email):
+        return False, "El cliente no tiene un email válido en el Maestro."
+
+    envio.email = cliente.email
+    envio.nombre_consorcio = cliente.nombre
+    return True, None

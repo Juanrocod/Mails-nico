@@ -2,6 +2,7 @@ from decimal import Decimal
 from app.services.excel_parser import DeudorRow
 from app.services.excel_joiner import join_deudores, PreviewData
 from app.models.cliente_maestro import ClienteMaestro
+from app.models.envio import Envio, EstadoEnvio
 
 
 def _add_cliente(db, clave, nombre, email=None, baja=False):
@@ -78,3 +79,119 @@ def test_join_filtrado_por_inactivo(db):
     assert len(preview.filtrados) == 1
     assert preview.filtrados[0][1] == "DADO_DE_BAJA"
     assert len(preview.para_enviar) == 0
+
+
+def test_revalidar_para_reenvio_cliente_no_encontrado(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.services.excel_joiner import revalidar_para_reenvio
+
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C030", nombre_consorcio="X",
+        email=None, monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.flush()
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    assert ok is False
+    assert "no existe" in motivo
+
+
+def test_revalidar_para_reenvio_dado_de_baja(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.services.excel_joiner import revalidar_para_reenvio
+
+    _add_cliente(db, "C031", "Consorcio Baja", email="baja@mail.com", baja=True)
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C031", nombre_consorcio="Consorcio Baja",
+        email="baja@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.flush()
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    assert ok is False
+    assert "baja" in motivo.lower()
+
+
+def test_revalidar_para_reenvio_inactivo(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.services.excel_joiner import revalidar_para_reenvio
+
+    _add_cliente(db, "C032", "Consorcio Inactivo", email="inactivo@mail.com")
+    cliente = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C032").first()
+    cliente.activo = False
+    db.flush()
+
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C032", nombre_consorcio="Consorcio Inactivo",
+        email="inactivo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.flush()
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    assert ok is False
+    assert "inactivo" in motivo.lower()
+
+
+def test_revalidar_para_reenvio_email_invalido(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.services.excel_joiner import revalidar_para_reenvio
+
+    _add_cliente(db, "C033", "Consorcio Email Malo", email="no-es-un-email")
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C033", nombre_consorcio="Consorcio Email Malo",
+        email="no-es-un-email", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.flush()
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    assert ok is False
+    assert "email" in motivo.lower()
+
+
+def test_revalidar_para_reenvio_valido_actualiza_datos(db):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.services.excel_joiner import revalidar_para_reenvio
+
+    _add_cliente(db, "C034", "Consorcio Corregido", email="corregido@mail.com")
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C034", nombre_consorcio="Nombre Viejo",
+        email="viejo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.flush()
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    assert ok is True
+    assert motivo is None
+    assert envio.email == "corregido@mail.com"
+    assert envio.nombre_consorcio == "Consorcio Corregido"
