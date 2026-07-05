@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { MaestroUploadModal } from "../components/upload/MaestroUploadModal";
+import { AgregarClienteModal } from "../components/maestro/AgregarClienteModal";
 import { getMaestro, updateCliente, uploadMaestro } from "../services/maestro";
 import type { ClienteMaestro } from "../types/domain";
 
@@ -15,6 +16,8 @@ type EditForm = {
 export default function MaestroPage() {
   const [clientes, setClientes] = useState<ClienteMaestro[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [agregarModalOpen, setAgregarModalOpen] = useState(false);
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -62,22 +65,72 @@ export default function MaestroPage() {
     }
   }
 
+  async function handleEliminar(c: ClienteMaestro) {
+    if (!window.confirm(`¿Eliminar a ${c.nombre}? Vas a poder reactivarlo despues desde "Mostrar inactivos".`)) {
+      return;
+    }
+    setError("");
+    try {
+      const updated = await updateCliente(c.id, { activo: false });
+      setClientes((prev) => prev.map((x) => (x.id === c.id ? updated : x)));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error eliminando el cliente");
+    }
+  }
+
+  async function handleReactivar(c: ClienteMaestro) {
+    setError("");
+    try {
+      const updated = await updateCliente(c.id, { activo: true });
+      setClientes((prev) => prev.map((x) => (x.id === c.id ? updated : x)));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error reactivando el cliente");
+    }
+  }
+
+  function handleClienteCreado(cliente: ClienteMaestro) {
+    setClientes((prev) => [...prev, cliente]);
+  }
+
+  const clientesVisibles = clientes.filter((c) => c.activo !== mostrarInactivos);
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-semibold text-foreground">Maestro de Clientes</h1>
           <span className="text-sm text-muted-foreground">
-            {clientes.length} clientes registrados
+            {clientesVisibles.length} clientes {mostrarInactivos ? "inactivos" : "registrados"}
           </span>
         </div>
-        <Button onClick={() => setModalOpen(true)}>Actualizar Maestro</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setAgregarModalOpen(true)}>
+            Agregar cliente
+          </Button>
+          <Button onClick={() => setModalOpen(true)}>Actualizar Maestro</Button>
+        </div>
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={mostrarInactivos}
+          onChange={(e) => setMostrarInactivos(e.target.checked)}
+          className="h-4 w-4 rounded border-border"
+        />
+        Mostrar inactivos
+      </label>
 
       <MaestroUploadModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onUpload={handleUpload}
+      />
+
+      <AgregarClienteModal
+        open={agregarModalOpen}
+        onClose={() => setAgregarModalOpen(false)}
+        onCreated={handleClienteCreado}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -109,7 +162,7 @@ export default function MaestroPage() {
             </tr>
           </thead>
           <tbody>
-            {clientes.map((c) => {
+            {clientesVisibles.map((c) => {
               const isEditing = editingId === c.id;
               return (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/50">
@@ -179,15 +232,36 @@ export default function MaestroPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
+                    ) : c.activo ? (
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => startEdit(c)}
+                          aria-label="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => handleEliminar(c)}
+                          aria-label="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8"
-                        onClick={() => startEdit(c)}
-                        aria-label="Editar"
+                        onClick={() => handleReactivar(c)}
+                        aria-label="Reactivar"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <RotateCcw className="h-4 w-4" />
                       </Button>
                     )}
                   </td>
