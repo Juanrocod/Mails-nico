@@ -16,7 +16,7 @@ from app.models.user import User
 from app.schemas.ciclo import PreviewItem, PreviewResponse
 from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
-from app.services.excel_joiner import join_deudores
+from app.services.excel_joiner import join_deudores, revalidar_para_reenvio
 from app.services.excel_parser import parse_deudores, ExcelParseError
 from app.services.smtp_sender import enviar_ciclo
 
@@ -212,4 +212,33 @@ def update_envio_estado(
     db.add(envio)
     db.commit()
     db.refresh(envio)
+    return envio
+
+
+@router.post("/envios/{envio_id}/reenviar", response_model=EnvioSchema)
+async def reenviar_envio(
+    envio_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    envio = db.get(Envio, envio_id)
+    if envio is None:
+        raise HTTPException(status_code=404, detail="Envio no encontrado")
+    if envio.estado != EstadoEnvio.NO_CONTESTADO or envio.message_id:
+        raise HTTPException(status_code=400, detail="Este envio no esta pendiente de reenvio")
+
+    ok, motivo = revalidar_para_reenvio(db, envio)
+    if not ok:
+        raise HTTPException(status_code=400, detail=motivo)
+
+    async def _noop(_envio: Envio) -> None:
+        pass
+
+    await enviar_ciclo([envio], db, _noop)
+    db.refresh(envio)
+    if not envio.message_id:
+        raise HTTPException(
+            status_code=502,
+            detail="No se pudo enviar el mail. Revisá las credenciales del proveedor de email.",
+        )
     return envio

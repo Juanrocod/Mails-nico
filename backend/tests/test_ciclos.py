@@ -154,3 +154,99 @@ def test_confirmar_ciclo(client, auth_headers, db, plantilla_default):
         ClienteMaestro.clave_union.in_(["C101", "C102"])
     ).delete(synchronize_session=False)
     db.commit()
+
+
+def test_reenviar_envio_no_elegible_400(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    ciclo = Ciclo(numero=201, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=201, clave_union="C201", nombre_consorcio="Ya Enviado",
+        email="ya@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        message_id="<abc@yahoo.com>", enviado_en=datetime.now(timezone.utc),
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    r = client.post(f"/envios/{envio.id}/reenviar", headers=auth_headers)
+    assert r.status_code == 400
+
+    # This Envio was committed with message_id + NO_CONTESTADO on the shared
+    # in-memory DB (see test_confirmar_ciclo comment above). Clean it up so
+    # downstream tests (e.g. test_imap_watcher.py) don't see a stray "active" envio.
+    db.delete(envio)
+    db.delete(ciclo)
+    db.commit()
+
+
+def test_reenviar_envio_cliente_invalido_400(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    ciclo = Ciclo(numero=202, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=202, clave_union="C202", nombre_consorcio="Sin Maestro",
+        email="viejo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    r = client.post(f"/envios/{envio.id}/reenviar", headers=auth_headers)
+    assert r.status_code == 400
+    assert "Maestro" in r.json()["detail"]
+
+
+def test_reenviar_envio_exitoso(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.models.cliente_maestro import ClienteMaestro
+
+    db.add(ClienteMaestro(
+        clave_union="C203", nombre="Consorcio Corregido", email="corregido@mail.com",
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    ciclo = Ciclo(numero=203, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=203, clave_union="C203", nombre_consorcio="Nombre Viejo",
+        email="viejo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+        mock_send.return_value = "<nuevo@yahoo.com>"
+        r = client.post(f"/envios/{envio.id}/reenviar", headers=auth_headers)
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["email"] == "corregido@mail.com"
+    assert data["message_id"] == "<nuevo@yahoo.com>"
+
+    # The endpoint committed this Envio (now with message_id + NO_CONTESTADO) and
+    # the seeded ClienteMaestro row to the shared in-memory DB (see test_confirmar_ciclo
+    # comment above). Remove them so downstream tests (test_imap_watcher.py,
+    # test_maestro.py) see clean state.
+    db.query(Envio).filter(Envio.id == envio.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C203").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_reenviar_envio_inexistente_404(client, auth_headers):
+    import uuid
+    r = client.post(f"/envios/{uuid.uuid4()}/reenviar", headers=auth_headers)
+    assert r.status_code == 404
