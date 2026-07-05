@@ -1,50 +1,44 @@
 # PENDIENTES.md — Gaps de implementación vs. spec
 
-Auditoría del código real contra `docs/superpowers/specs/2026-06-30-mails-nico-design.md` y `docs/adr/`. Fecha: 2026-07-01.
+Auditoría del código real contra `docs/superpowers/specs/2026-06-30-mails-nico-design.md` y `docs/adr/`. Fecha: 2026-07-05 (actualizado — la versión anterior, del 2026-07-01, estaba desactualizada: casi todo lo que marcaba como pendiente ya se resolvió).
 
-El flujo core (subir Excel → preview → confirmar → SMTP con rate limit → IMAP watcher → seguimiento → override manual) está completo y probado. Lo que sigue es lo que falta para cerrar el spec.
+El flujo core (subir Excel → preview → confirmar → SMTP con rate limit → IMAP watcher → seguimiento → override manual) está completo y probado, incluyendo las features agregadas hoy: proveedor de email configurable (Yahoo/Gmail), borrar/reactivar/agregar clientes en Maestro, pestaña Enviados + reenvío de fallidos.
 
 ---
 
-## Crítico
+## Resuelto desde la última auditoría
 
-### 1. Endpoint de unsubscribe
-El mail genera el link (`email_generator.py`) y el modelo tiene `ClienteMaestro.prefiere_no_recibir_email`, pero **no existe ningún endpoint que reciba el click**. Hoy el link no hace nada. Falta:
-- Ruta (ej. `GET /unsubscribe/{token}` o similar) que setee `prefiere_no_recibir_email=true`
-- Notificación al operario (spec sección 7)
-- Requisito legal (Ley 25.326) — no debería salir a producción sin esto
+- **Endpoint de unsubscribe** (`GET /unsubscribe/{token}`) — existe en `routers/unsubscribe.py`, setea `prefiere_no_recibir_email=true`.
+- **Página Configuración** — completa: selector de proveedor (Yahoo/Gmail), credenciales de ambos, cambio de contraseña.
+- **Validación de palabras prohibidas en Plantilla** — implementada en `schemas/plantilla.py` (`PALABRAS_PROHIBIDAS`, validador `sin_palabras_prohibidas`).
+- **Validación de formato de email antes de enviar** — `excel_joiner.join_deudores` usa `is_valid_email` antes de mandar a `para_enviar`.
+- **Logo del mail** — `POST /plantilla/logo` sube el archivo, `PlantillaPage.tsx` tiene input de archivo.
+- **Campos `reply_en` y `tiene_adjunto` en `Envio`** — existen en `models/envio.py` y se usan en `imap_watcher.py`/`reply_classifier.py`.
+- **App password real de Yahoo/Gmail** — resuelto en la práctica: el sistema ahora soporta ambos proveedores intercambiables desde Configuración: si Yahoo da problemas, Gmail funciona como alternativa completa (probado end-to-end en producción).
+- **Estructura del Excel de deudores y maestro** — confirmada con archivos reales: `nro cliente` (numérico, 8 dígitos con ceros a la izquierda, ej. `00000001`), `nombre`, `localidad`, `monto`.
 
 ---
 
 ## Importante
 
-### 2. Página Configuración incompleta
-Hoy solo tiene cambio de contraseña. El spec pide gestión de credenciales Yahoo (SMTP/IMAP) y datos de empresa desde la UI; hoy viven fijas en `.env`.
+### 1. Render free tier bloqueaba el puerto SMTP — resuelto pasando a plan Starter
+El 2026-07-05 se detectó que el envío nunca completaba en producción (`OSError: Network is unreachable`). Causa: Render bloquea tráfico saliente a los puertos SMTP (25/465/587) en el plan gratuito desde septiembre 2025. Se resolvió pasando el servicio a un plan Starter ($7/mes), que además elimina el "spin down" a los 15 min de inactividad — relevante porque el IMAP Watcher corre en background sin generar tráfico HTTP propio, así que en el plan free tampoco corría de forma confiable. De paso se agregó un timeout de 15s a la conexión SMTP (`smtp_sender.py`) para que un proveedor mal configurado falle rápido y visible en vez de trabar el ciclo entero.
 
-### 3. Validación de palabras prohibidas en Plantilla
-No implementada al guardar asunto/cuerpo (spec sección 7, anti-spam).
-
-### 4. Validación de formato de email antes de enviar
-Hoy solo se chequea que el campo no esté vacío (`excel_joiner.py`), no que sea un email válido.
-
-### 5. Logo del mail — solo URL de texto
-`Plantilla.logo_url` es un string; no hay endpoint de upload de imagen ni input de archivo en `PlantillaPage.tsx`.
-
-### 7. Sin timeout en la conexión SMTP (`smtp_sender.py`)
-`smtplib.SMTP(host, port)` se abre sin timeout explícito. Si el proveedor activo tiene credenciales mal configuradas (ej. Yahoo sin app password real), el intento de conexión/login puede colgarse en vez de fallar rápido — en producción esto hizo que `/ciclos/confirmar` se quedara con la respuesta SSE en estado "Pending" para siempre (sin enviar nada ni mostrar error), probablemente porque el timeout del proxy de Render cortó la conexión antes de que Python llegara a levantar la excepción. Agregar un timeout corto (ej. 10-15s) a `smtplib.SMTP(...)` para que un proveedor mal configurado falle rápido y visible en vez de trabar todo el ciclo.
+**Si en algún momento se vuelve a un plan gratuito o se cambia de hosting, este problema reaparece.**
 
 ---
 
 ## Menor
 
-### 6. Campos `reply_en` y `tiene_adjunto` en `Envio`
-El spec (sección 5, modelo de datos) los define pero no existen en `models/envio.py`. No rompen nada en runtime (el frontend tampoco los usa), pero sin ellos no se puede distinguir un `PAGO` por adjunto real de uno por override manual, ni separar fecha de respuesta del snippet.
+### 2. Reenvío en bloque — pequeños detalles de UX
+- El botón "Reenviar todos (N)" muestra el total de fallidos candidatos, no el total que efectivamente se reintenta (los que no pasan la revalidación contra Maestro quedan afuera del conteo de progreso). Cosmético.
+- Un cliente creado manualmente en Maestro mientras el filtro "Mostrar inactivos" está tildado no aparece hasta destildar el filtro (el nuevo cliente es activo por default).
+
+### 3. Sin test de integración continuo del flujo "falla → se corrige Maestro → se reenvía → aparece en Enviados"
+Cada paso individual está testeado, pero no hay un único test que atraviese las cuatro etapas en una corrida.
 
 ---
 
-## Pendientes bloqueantes de datos (ya conocidos, sin cambios)
+## Pendientes bloqueantes de datos
 
-Ver también `CLAUDE.md`:
-- [ ] Estructura exacta y clave de unión del Excel de deudores
-- [ ] Estructura exacta y clave de unión del Excel maestro
-- [ ] App password real de Yahoo del cliente
+Todos resueltos — ver sección "Resuelto" arriba.
