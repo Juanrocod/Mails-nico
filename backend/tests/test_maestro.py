@@ -111,3 +111,88 @@ def test_update_cliente_toggle_baja_manual(client, auth_headers, db):
     )
     assert r.status_code == 200
     assert r.json()["prefiere_no_recibir_email"] is True
+
+
+def test_update_cliente_marca_inactivo(client, auth_headers, db):
+    from app.models.cliente_maestro import ClienteMaestro
+    cliente = ClienteMaestro(clave_union="C020", nombre="Consorcio Veinte", email="veinte@mail.com")
+    db.add(cliente)
+    db.commit()
+
+    r = client.put(
+        f"/maestro/{cliente.id}",
+        json={"activo": False},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["activo"] is False
+
+
+def test_update_cliente_reactiva(client, auth_headers, db):
+    from app.models.cliente_maestro import ClienteMaestro
+    cliente = ClienteMaestro(clave_union="C021", nombre="Consorcio Veintiuno", email="21@mail.com", activo=False)
+    db.add(cliente)
+    db.commit()
+
+    r = client.put(
+        f"/maestro/{cliente.id}",
+        json={"activo": True},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["activo"] is True
+
+
+def test_crear_cliente_manual(client, auth_headers):
+    r = client.post(
+        "/maestro",
+        json={"clave_union": "C030", "nombre": "Consorcio Treinta", "email": "treinta@mail.com"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["clave_union"] == "C030"
+    assert data["activo"] is True
+    assert data["prefiere_no_recibir_email"] is False
+
+
+def test_crear_cliente_clave_duplicada_activa_rechaza(client, auth_headers, db):
+    from app.models.cliente_maestro import ClienteMaestro
+    db.add(ClienteMaestro(clave_union="C031", nombre="Ya Existe", email="existe@mail.com"))
+    db.commit()
+
+    r = client.post(
+        "/maestro",
+        json={"clave_union": "C031", "nombre": "Otro Nombre"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 409
+    assert "inactivo" not in r.json()["detail"]
+
+
+def test_crear_cliente_clave_duplicada_inactiva_sugiere_reactivar(client, auth_headers, db):
+    from app.models.cliente_maestro import ClienteMaestro
+    db.add(ClienteMaestro(clave_union="C032", nombre="Inactivo", email="inactivo@mail.com", activo=False))
+    db.commit()
+
+    r = client.post(
+        "/maestro",
+        json={"clave_union": "C032", "nombre": "Otro Nombre"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 409
+    assert "inactivo" in r.json()["detail"]
+
+
+def test_crear_cliente_nombre_vacio_rechaza(client, auth_headers):
+    r = client.post(
+        "/maestro",
+        json={"clave_union": "C033", "nombre": "   "},
+        headers=auth_headers,
+    )
+    assert r.status_code == 422
+
+
+def test_crear_cliente_requiere_auth(client):
+    r = client.post("/maestro", json={"clave_union": "C034", "nombre": "X"})
+    assert r.status_code in (401, 403)

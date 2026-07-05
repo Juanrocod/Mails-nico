@@ -28,6 +28,7 @@ class ClienteMaestroUpdate(BaseModel):
     email: Optional[str] = None
     localidad: Optional[str] = None
     prefiere_no_recibir_email: Optional[bool] = None
+    activo: Optional[bool] = None
 
     @field_validator("nombre")
     @classmethod
@@ -35,6 +36,34 @@ class ClienteMaestroUpdate(BaseModel):
         if v is not None and not v.strip():
             raise ValueError("El nombre no puede estar vacío")
         return v
+
+    @field_validator("email")
+    @classmethod
+    def email_valido(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip() and not is_valid_email(v.strip()):
+            raise ValueError("El email no tiene un formato válido")
+        return v
+
+
+class ClienteMaestroCreate(BaseModel):
+    clave_union: str
+    nombre: str
+    email: Optional[str] = None
+    localidad: Optional[str] = None
+
+    @field_validator("clave_union")
+    @classmethod
+    def clave_no_vacia(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("La clave de unión no puede estar vacía")
+        return v.strip()
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_no_vacio(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("El nombre no puede estar vacío")
+        return v.strip()
 
     @field_validator("email")
     @classmethod

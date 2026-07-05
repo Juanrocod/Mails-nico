@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -7,7 +8,12 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.cliente_maestro import ClienteMaestro
-from app.schemas.maestro import ClienteMaestroSchema, ClienteMaestroUpdate, MaestroUploadResponse
+from app.schemas.maestro import (
+    ClienteMaestroSchema,
+    ClienteMaestroUpdate,
+    ClienteMaestroCreate,
+    MaestroUploadResponse,
+)
 from app.services.excel_parser import parse_maestro, ExcelParseError
 from app.services.maestro_service import merge_maestro
 
@@ -36,6 +42,36 @@ def get_maestro(
     return db.query(ClienteMaestro).order_by(ClienteMaestro.nombre).all()
 
 
+@router.post("", response_model=ClienteMaestroSchema, status_code=201)
+def crear_cliente(
+    payload: ClienteMaestroCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == payload.clave_union).first()
+    if existing:
+        if existing.activo:
+            detail = f"Ya existe un cliente activo con la clave '{payload.clave_union}'."
+        else:
+            detail = (
+                f"Ya existe un cliente con la clave '{payload.clave_union}', pero está inactivo. "
+                "Reactivalo en vez de crear uno nuevo."
+            )
+        raise HTTPException(status_code=409, detail=detail)
+
+    cliente = ClienteMaestro(
+        clave_union=payload.clave_union,
+        nombre=payload.nombre,
+        email=(payload.email or "").strip() or None,
+        localidad=(payload.localidad or "").strip() or None,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(cliente)
+    db.commit()
+    db.refresh(cliente)
+    return cliente
+
+
 @router.put("/{cliente_id}", response_model=ClienteMaestroSchema)
 def update_cliente(
     cliente_id: UUID,
@@ -56,6 +92,8 @@ def update_cliente(
         cliente.localidad = (data["localidad"] or "").strip() or None
     if "prefiere_no_recibir_email" in data:
         cliente.prefiere_no_recibir_email = data["prefiere_no_recibir_email"]
+    if "activo" in data:
+        cliente.activo = data["activo"]
 
     db.commit()
     db.refresh(cliente)
