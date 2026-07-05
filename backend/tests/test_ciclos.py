@@ -250,3 +250,65 @@ def test_reenviar_envio_inexistente_404(client, auth_headers):
     import uuid
     r = client.post(f"/envios/{uuid.uuid4()}/reenviar", headers=auth_headers)
     assert r.status_code == 404
+
+
+def test_reenviar_fallidos_mezcla_elegibles_e_inelegibles(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.models.cliente_maestro import ClienteMaestro
+
+    db.add(ClienteMaestro(
+        clave_union="C210", nombre="Consorcio Valido", email="valido@mail.com",
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+
+    # Este test depende de "el" ciclo activo — desactivar cualquier otro que
+    # haya quedado activo de un test anterior en esta misma corrida.
+    db.query(Ciclo).update({"activo": False})
+    db.flush()
+
+    ciclo = Ciclo(numero=299, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    envio_ok = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=299, clave_union="C210", nombre_consorcio="Nombre Viejo",
+        email="viejo@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    envio_sin_maestro = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=299, clave_union="C211", nombre_consorcio="Sin Maestro",
+        email="x@mail.com", monto=Decimal("2000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio_ok)
+    db.add(envio_sin_maestro)
+    db.commit()
+
+    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+        mock_send.return_value = "<reenv@yahoo.com>"
+        r = client.post("/ciclos/activo/reenviar-fallidos", headers=auth_headers)
+
+    assert r.status_code == 200
+    body = r.text
+    assert '"done"' in body
+    assert '"saltados"' in body
+    assert str(envio_sin_maestro.id) in body
+    assert "no existe" in body
+
+    db.expire_all()
+    db.refresh(envio_ok)
+    db.refresh(envio_sin_maestro)
+    assert envio_ok.message_id == "<reenv@yahoo.com>"
+    assert envio_sin_maestro.message_id is None
+
+    # The endpoint committed envio_ok (now with message_id + NO_CONTESTADO) and
+    # the seeded ClienteMaestro row to the shared in-memory DB (see
+    # test_confirmar_ciclo comment above). Remove them so downstream tests
+    # (test_imap_watcher.py, test_maestro.py) see clean state.
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C210").delete(synchronize_session=False)
+    db.commit()

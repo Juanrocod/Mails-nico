@@ -242,3 +242,40 @@ async def reenviar_envio(
             detail="No se pudo enviar el mail. Revisá las credenciales del proveedor de email.",
         )
     return envio
+
+
+@router.post("/ciclos/activo/reenviar-fallidos")
+async def reenviar_fallidos(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ciclo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    if not ciclo:
+        raise HTTPException(status_code=404, detail="No hay un ciclo activo")
+
+    fallidos = (
+        db.query(Envio)
+        .filter(
+            Envio.ciclo_id == ciclo.id,
+            Envio.estado == EstadoEnvio.NO_CONTESTADO,
+            Envio.message_id.is_(None),
+        )
+        .all()
+    )
+
+    listos: list[Envio] = []
+    saltados: list[dict] = []
+    for envio in fallidos:
+        ok, motivo = revalidar_para_reenvio(db, envio)
+        if ok:
+            listos.append(envio)
+        else:
+            saltados.append({"id": str(envio.id), "motivo": motivo})
+
+    async def event_generator():
+        async for chunk in _stream_envios(listos, db):
+            yield chunk
+        total = len(listos)
+        yield f"data: {json.dumps({'done': True, 'total': total, 'saltados': saltados})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
