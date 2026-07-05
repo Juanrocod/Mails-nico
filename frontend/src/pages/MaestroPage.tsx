@@ -13,6 +13,17 @@ type EditForm = {
   prefiere_no_recibir_email: boolean;
 };
 
+function esInactivo(c: ClienteMaestro): boolean {
+  return !c.activo || c.prefiere_no_recibir_email;
+}
+
+function motivoInactivo(c: ClienteMaestro): string {
+  const motivos: string[] = [];
+  if (c.prefiere_no_recibir_email) motivos.push("Baja");
+  if (!c.activo) motivos.push("Eliminado");
+  return motivos.join(" + ");
+}
+
 export default function MaestroPage() {
   const [clientes, setClientes] = useState<ClienteMaestro[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -81,7 +92,7 @@ export default function MaestroPage() {
   async function handleReactivar(c: ClienteMaestro) {
     setError("");
     try {
-      const updated = await updateCliente(c.id, { activo: true });
+      const updated = await updateCliente(c.id, { activo: true, prefiere_no_recibir_email: false });
       setClientes((prev) => prev.map((x) => (x.id === c.id ? updated : x)));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error reactivando el cliente");
@@ -94,7 +105,7 @@ export default function MaestroPage() {
     );
   }
 
-  const clientesVisibles = clientes.filter((c) => c.activo !== mostrarInactivos);
+  const clientesVisibles = clientes.filter((c) => esInactivo(c) === mostrarInactivos);
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -158,7 +169,7 @@ export default function MaestroPage() {
                 Email
               </th>
               <th className="py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Baja
+                {mostrarInactivos ? "Motivo" : "Baja"}
               </th>
               <th aria-hidden />
             </tr>
@@ -195,7 +206,9 @@ export default function MaestroPage() {
                     )}
                   </td>
                   <td className="py-2.5 text-muted-foreground">
-                    {isEditing && editForm ? (
+                    {mostrarInactivos ? (
+                      motivoInactivo(c)
+                    ) : isEditing && editForm ? (
                       <input
                         type="checkbox"
                         checked={editForm.prefiere_no_recibir_email}
@@ -234,7 +247,7 @@ export default function MaestroPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : c.activo ? (
+                    ) : !esInactivo(c) ? (
                       <div className="flex gap-1">
                         <Button
                           size="icon"
