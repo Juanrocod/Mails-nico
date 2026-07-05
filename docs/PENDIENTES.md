@@ -30,6 +30,9 @@ Hoy solo se chequea que el campo no esté vacío (`excel_joiner.py`), no que sea
 ### 5. Logo del mail — solo URL de texto
 `Plantilla.logo_url` es un string; no hay endpoint de upload de imagen ni input de archivo en `PlantillaPage.tsx`.
 
+### 7. Sin timeout en la conexión SMTP (`smtp_sender.py`)
+`smtplib.SMTP(host, port)` se abre sin timeout explícito. Si el proveedor activo tiene credenciales mal configuradas (ej. Yahoo sin app password real), el intento de conexión/login puede colgarse en vez de fallar rápido — en producción esto hizo que `/ciclos/confirmar` se quedara con la respuesta SSE en estado "Pending" para siempre (sin enviar nada ni mostrar error), probablemente porque el timeout del proxy de Render cortó la conexión antes de que Python llegara a levantar la excepción. Agregar un timeout corto (ej. 10-15s) a `smtplib.SMTP(...)` para que un proveedor mal configurado falle rápido y visible en vez de trabar todo el ciclo.
+
 ---
 
 ## Menor
