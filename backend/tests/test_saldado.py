@@ -161,3 +161,182 @@ def test_confirmar_ciclo_marca_saldados_del_anterior(client, auth_headers, db, p
     db.query(Ciclo).filter(Ciclo.id.in_([ciclo_ant.id, ciclo_nuevo.id])).delete(synchronize_session=False)
     db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "SAL-G").delete(synchronize_session=False)
     db.commit()
+
+
+def test_confirmar_asigna_racha_1_a_deudor_nuevo(client, auth_headers, db, plantilla_default):
+    """Un deudor sin historial de Envios arranca con ciclo_numero == 1 (racha)."""
+    import io
+    import openpyxl
+    from unittest.mock import patch, AsyncMock
+
+    db.query(Ciclo).update({"activo": False})
+    db.add(ClienteMaestro(clave_union="RN-A", nombre="Nuevo", email="rna@mail.com",
+                          actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["nro cliente", "nombre", "localidad", "monto"])
+    ws.append(["RN-A", "Nuevo", "CABA", 1000])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    with patch("app.routers.ciclos.enviar_ciclo", new_callable=AsyncMock):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+
+    ciclo_nuevo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    envio_nuevo = (
+        db.query(Envio)
+        .filter(Envio.clave_union == "RN-A", Envio.ciclo_id == ciclo_nuevo.id)
+        .first()
+    )
+    assert envio_nuevo is not None
+    assert envio_nuevo.ciclo_numero == 1
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo_nuevo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo_nuevo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "RN-A").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_confirmar_incrementa_racha_del_que_repite(client, auth_headers, db, plantilla_default):
+    """Un deudor con Envio previo sin saldar continua la racha (+1), no el numero global de ciclo."""
+    import io
+    import openpyxl
+    from unittest.mock import patch, AsyncMock
+
+    db.query(Ciclo).update({"activo": False})
+    ciclo_ant = Ciclo(numero=9101, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo_ant)
+    db.flush()
+    _make_envio(db, ciclo_ant, "RN-B", ciclo_numero=2)
+    db.add(ClienteMaestro(clave_union="RN-B", nombre="Repite", email="rnb@mail.com",
+                          actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["nro cliente", "nombre", "localidad", "monto"])
+    ws.append(["RN-B", "Repite", "CABA", 2000])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    with patch("app.routers.ciclos.enviar_ciclo", new_callable=AsyncMock):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+
+    ciclo_nuevo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    envio_nuevo = (
+        db.query(Envio)
+        .filter(Envio.clave_union == "RN-B", Envio.ciclo_id == ciclo_nuevo.id)
+        .first()
+    )
+    assert envio_nuevo is not None
+    assert envio_nuevo.ciclo_numero == 3
+
+    db.query(Envio).filter(Envio.ciclo_id.in_([ciclo_ant.id, ciclo_nuevo.id])).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id.in_([ciclo_ant.id, ciclo_nuevo.id])).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "RN-B").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_confirmar_resetea_racha_tras_saldado(client, auth_headers, db, plantilla_default):
+    """Un deudor cuyo ultimo Envio esta saldado arranca la racha de cero al reaparecer."""
+    import io
+    import openpyxl
+    from unittest.mock import patch, AsyncMock
+
+    db.query(Ciclo).update({"activo": False})
+    ciclo_viejo = Ciclo(numero=9102, activo=False, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo_viejo)
+    db.flush()
+    _make_envio(db, ciclo_viejo, "RN-C", ciclo_numero=4, saldado_en=datetime.now(timezone.utc))
+    db.add(ClienteMaestro(clave_union="RN-C", nombre="Saldado", email="rnc@mail.com",
+                          actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["nro cliente", "nombre", "localidad", "monto"])
+    ws.append(["RN-C", "Saldado", "CABA", 1500])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    with patch("app.routers.ciclos.enviar_ciclo", new_callable=AsyncMock):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+
+    ciclo_nuevo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    envio_nuevo = (
+        db.query(Envio)
+        .filter(Envio.clave_union == "RN-C", Envio.ciclo_id == ciclo_nuevo.id)
+        .first()
+    )
+    assert envio_nuevo is not None
+    assert envio_nuevo.ciclo_numero == 1
+
+    db.query(Envio).filter(Envio.ciclo_id.in_([ciclo_viejo.id, ciclo_nuevo.id])).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id.in_([ciclo_viejo.id, ciclo_nuevo.id])).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "RN-C").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_confirmar_asigna_racha_a_filtrados_y_sin_email(client, auth_headers, db, plantilla_default):
+    """FILTRADO y SIN_EMAIL tambien son deudores: la racha se computa para ellos tambien."""
+    import io
+    import openpyxl
+    from unittest.mock import patch, AsyncMock
+
+    db.query(Ciclo).update({"activo": False})
+    db.add(ClienteMaestro(clave_union="RN-D", nombre="Baja", email="rnd@mail.com",
+                          prefiere_no_recibir_email=True,
+                          actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["nro cliente", "nombre", "localidad", "monto"])
+    ws.append(["RN-D", "Baja", "CABA", 1000])
+    ws.append(["RN-E", "SinMaestro", "CABA", 1000])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    with patch("app.routers.ciclos.enviar_ciclo", new_callable=AsyncMock):
+        r = client.post(
+            "/ciclos/confirmar",
+            files={"file": ("deudores.xlsx", buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+
+    ciclo_nuevo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    envio_filtrado = (
+        db.query(Envio).filter(Envio.clave_union == "RN-D", Envio.ciclo_id == ciclo_nuevo.id).first()
+    )
+    envio_sin_email = (
+        db.query(Envio).filter(Envio.clave_union == "RN-E", Envio.ciclo_id == ciclo_nuevo.id).first()
+    )
+    assert envio_filtrado is not None and envio_filtrado.ciclo_numero == 1
+    assert envio_sin_email is not None and envio_sin_email.ciclo_numero == 1
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo_nuevo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo_nuevo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "RN-D").delete(synchronize_session=False)
+    db.commit()

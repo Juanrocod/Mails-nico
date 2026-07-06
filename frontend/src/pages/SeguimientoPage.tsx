@@ -30,6 +30,11 @@ export default function SeguimientoPage() {
   const navigate = useNavigate();
 
   const activeTab = PATH_TO_TAB[location.pathname] ?? "no_contestados";
+  const cicloActivoSeleccionado = cicloSeleccionado === "activo";
+  const numeroCicloSeleccionado = ciclos.find((c) => c.id === cicloSeleccionado)?.numero;
+  const subtitulo = cicloActivoSeleccionado
+    ? "Estado de respuesta de los mails del ciclo activo"
+    : `Estado de respuesta de los mails del ciclo #${numeroCicloSeleccionado} (histórico)`;
 
   useEffect(() => {
     getEnviosActivo().then(setEnvios).catch(console.error);
@@ -97,9 +102,7 @@ export default function SeguimientoPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-semibold text-foreground">Seguimiento</h1>
-          <span className="text-sm text-muted-foreground">
-            Estado de respuesta de los mails del ciclo activo
-          </span>
+          <span className="text-sm text-muted-foreground">{subtitulo}</span>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefrescar} disabled={refrescando}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refrescando ? "animate-spin" : ""}`} />

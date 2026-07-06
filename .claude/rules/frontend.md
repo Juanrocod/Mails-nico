@@ -36,6 +36,7 @@ src/
 
 ```
 /login                        → LoginPage
+/dashboard                    → DashboardPage
 /nuevo-envio/para-enviar      → NuevoEnvioPage (tab="PARA_ENVIAR")
 /nuevo-envio/sin-email        → NuevoEnvioPage (tab="SIN_EMAIL")
 /nuevo-envio/filtrados        → NuevoEnvioPage (tab="FILTRADO")
@@ -44,9 +45,10 @@ src/
 /seguimiento/pagos            → SeguimientoPage (tab="PAGO")
 /seguimiento/rebotados        → SeguimientoPage (tab="REBOTADO")
 /maestro                      → MaestroPage
+/clientes/:clave              → ClientePerfilPage
 /plantilla                    → PlantillaPage
 /configuracion                → ConfiguracionPage
-/                             → redirect /seguimiento/no-contestados
+/                             → redirect /dashboard
 ```
 
 ## Tipos de dominio (`src/types/domain.ts`)

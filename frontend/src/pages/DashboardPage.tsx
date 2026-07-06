@@ -17,7 +17,7 @@ function pesos(n: number | null): string {
 }
 
 function variacion(actual: number, anterior: number | null): string {
-  if (anterior === null || anterior === 0) return "";
+  if (anterior === null || Number(anterior) === 0) return "";
   const pct = ((actual - anterior) / anterior) * 100;
   const signo = pct > 0 ? "+" : "";
   return `${signo}${pct.toFixed(1)}% vs. ciclo anterior`;
@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [evolucion, setEvolucion] = useState<EvolucionCiclo[]>([]);
   const [envios, setEnvios] = useState<Envio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,7 +57,10 @@ export default function DashboardPage() {
         setEvolucion(e);
         setEnvios(envs);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setLoadError("No se pudo cargar el dashboard. Probá recargar la página.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,7 +96,9 @@ export default function DashboardPage() {
         <span className="text-sm text-muted-foreground">Estado de la cobranza según el último Excel</span>
       </div>
 
-      {!resumen?.hay_ciclo_activo ? (
+      {loadError ? (
+        <p className="text-sm text-destructive">{loadError}</p>
+      ) : !resumen?.hay_ciclo_activo ? (
         <div className="rounded-md border border-dashed border-border py-12 text-center">
           <p className="text-sm font-medium text-foreground">Todavía no hay ciclos cargados</p>
           <p className="text-sm text-muted-foreground">Subí el primer Excel de deudores para empezar a medir.</p>

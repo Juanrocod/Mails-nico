@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Optional
 
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.validators import is_valid_email
 from app.models.cliente_maestro import ClienteMaestro
+from app.models.ciclo import Ciclo
 from app.models.envio import Envio, EstadoEnvio
 from app.services.excel_parser import DeudorRow
 
@@ -25,13 +26,15 @@ class PreviewData:
     para_enviar: list[EnvioParsed]
     sin_email: list[DeudorRow]
     filtrados: list[tuple[DeudorRow, str]]  # (row, motivo)
+    rachas: dict[str, int] = field(default_factory=dict)
 
 
 def _ciclos_consecutivos_deudor(db: Session, clave_union: str) -> int:
     last = (
         db.query(Envio)
+        .join(Ciclo, Envio.ciclo_id == Ciclo.id)
         .filter(Envio.clave_union == clave_union)
-        .order_by(Envio.ciclo_numero.desc())
+        .order_by(Ciclo.numero.desc())
         .first()
     )
     # PAGO manual o saldado inferido = racha rota: la proxima deuda arranca de cero.
@@ -44,6 +47,7 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
     para_enviar = []
     sin_email = []
     filtrados = []
+    rachas: dict[str, int] = {}
 
     claves = [d.clave_union for d in deudores]
     clientes = {
@@ -52,6 +56,9 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
     }
 
     for deudor in deudores:
+        if deudor.clave_union not in rachas:
+            rachas[deudor.clave_union] = _ciclos_consecutivos_deudor(db, deudor.clave_union) + 1
+
         cliente = clientes.get(deudor.clave_union)
         if cliente is None:
             sin_email.append(deudor)
@@ -65,7 +72,7 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
         if not cliente.email or not is_valid_email(cliente.email):
             sin_email.append(deudor)
             continue
-        ciclo_ant = _ciclos_consecutivos_deudor(db, deudor.clave_union)
+        ciclo_ant = rachas[deudor.clave_union] - 1
         para_enviar.append(EnvioParsed(
             clave_union=deudor.clave_union,
             nombre=cliente.nombre,
@@ -75,7 +82,7 @@ def join_deudores(db: Session, deudores: list[DeudorRow], monto_minimo: Decimal)
             ciclo_numero_anterior=ciclo_ant,
         ))
 
-    return PreviewData(para_enviar=para_enviar, sin_email=sin_email, filtrados=filtrados)
+    return PreviewData(para_enviar=para_enviar, sin_email=sin_email, filtrados=filtrados, rachas=rachas)
 
 
 def _motivo_invalido_para_reenvio(cliente: Optional[ClienteMaestro]) -> Optional[str]:

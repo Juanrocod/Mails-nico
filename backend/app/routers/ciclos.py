@@ -131,7 +131,7 @@ async def confirmar_ciclo(
     for ep in preview.para_enviar:
         e = Envio(
             ciclo_id=nuevo_ciclo.id,
-            ciclo_numero=nuevo_ciclo.numero,
+            ciclo_numero=preview.rachas[ep.clave_union],
             clave_union=ep.clave_union,
             nombre_consorcio=ep.nombre,
             email=ep.email,
@@ -145,7 +145,7 @@ async def confirmar_ciclo(
     for deudor, motivo in preview.filtrados:
         e = Envio(
             ciclo_id=nuevo_ciclo.id,
-            ciclo_numero=nuevo_ciclo.numero,
+            ciclo_numero=preview.rachas[deudor.clave_union],
             clave_union=deudor.clave_union,
             nombre_consorcio=deudor.nombre,
             monto=deudor.monto,
@@ -158,7 +158,7 @@ async def confirmar_ciclo(
     for deudor in preview.sin_email:
         e = Envio(
             ciclo_id=nuevo_ciclo.id,
-            ciclo_numero=nuevo_ciclo.numero,
+            ciclo_numero=preview.rachas[deudor.clave_union],
             clave_union=deudor.clave_union,
             nombre_consorcio=deudor.nombre,
             monto=deudor.monto,
