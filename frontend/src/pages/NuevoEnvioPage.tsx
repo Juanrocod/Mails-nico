@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Send, MailX, Filter, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -49,6 +49,10 @@ export default function NuevoEnvioPage() {
   const [reenvioError, setReenvioError] = useState("");
   const [reenvioSaltados, setReenvioSaltados] = useState<{ id: string; motivo: string }[]>([]);
   const [reenvioSuccess, setReenvioSuccess] = useState<{ enviados: number; total: number } | null>(null);
+  const [recuperadoCompletado, setRecuperadoCompletado] = useState<{ enviados: number; total: number } | null>(
+    null,
+  );
+  const enviandoseAnteriorRef = useRef(0);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -71,6 +75,12 @@ export default function NuevoEnvioPage() {
     return () => clearTimeout(t);
   }, [reenvioSuccess]);
 
+  useEffect(() => {
+    if (!recuperadoCompletado) return;
+    const t = setTimeout(() => setRecuperadoCompletado(null), 5000);
+    return () => clearTimeout(t);
+  }, [recuperadoCompletado]);
+
   const paraEnviarPreview: TableRow[] = revisando
     ? previewData!.items_para_enviar.map((i) => ({ key: i.clave_union, ...i }))
     : [];
@@ -89,6 +99,26 @@ export default function NuevoEnvioPage() {
     : enviosActivo.filter((e) => e.estado === "FILTRADO").map((e) => ({ key: e.id, ...e }));
 
   const paraEnviarCount = revisando ? paraEnviarPreview.length : fallidos.length;
+
+  // El envio en curso sobrevive a un F5 (sigue mandando de fondo en el
+  // servidor), pero la barra en vivo (SSE) de esta pestaña se pierde. Mientras
+  // haya envios en_proceso y no tengamos ya una barra en vivo corriendo, vamos
+  // pidiendo el estado real cada 2s para reconstruir el progreso desde los
+  // datos en vez de depender de la conexion original.
+  useEffect(() => {
+    const hayEnCurso = enviandose.length > 0;
+    if (isLoading || !hayEnCurso) return;
+    const interval = setInterval(loadEnviosActivo, 2000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, enviandose.length > 0, loadEnviosActivo]);
+
+  useEffect(() => {
+    if (!isLoading && enviandoseAnteriorRef.current > 0 && enviandose.length === 0) {
+      setRecuperadoCompletado({ enviados: enviados.length, total: enviados.length });
+    }
+    enviandoseAnteriorRef.current = enviandose.length;
+  }, [enviandose.length, enviados.length, isLoading]);
 
   function handleTabChange(value: string) {
     const paths: Record<string, string> = {
@@ -171,8 +201,17 @@ export default function NuevoEnvioPage() {
         </div>
       )}
 
+      {!isLoading && enviandose.length > 0 && (
+        <div className="rounded-md border border-border bg-secondary/60 p-4">
+          <ProgresoEnvio enviado={enviados.length} total={enviados.length + enviandose.length} />
+        </div>
+      )}
+
       {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
       {confirmSuccess && <EnvioCompletado enviados={confirmEnviados} total={confirmTotal} />}
+      {recuperadoCompletado && (
+        <EnvioCompletado enviados={recuperadoCompletado.enviados} total={recuperadoCompletado.total} />
+      )}
 
       {reenvioProgreso && reenviandoTodos && (
         <div className="rounded-md border border-border bg-secondary/60 p-4">
