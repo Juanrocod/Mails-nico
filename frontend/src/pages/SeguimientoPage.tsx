@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Button } from "../components/ui/button";
 import { EnvioCard } from "../components/envios/EnvioCard";
 import { EnvioDrawer } from "../components/envios/EnvioDrawer";
 import { getEnviosActivo } from "../services/ciclos";
 import { patchEnvioEstado } from "../services/envios";
+import { refrescarSeguimiento } from "../services/seguimiento";
 import type { Envio } from "../types/domain";
 
 const PATH_TO_TAB: Record<string, string> = {
@@ -17,6 +20,8 @@ const PATH_TO_TAB: Record<string, string> = {
 export default function SeguimientoPage() {
   const [envios, setEnvios] = useState<Envio[]>([]);
   const [selected, setSelected] = useState<Envio | null>(null);
+  const [refrescando, setRefrescando] = useState(false);
+  const [refrescarError, setRefrescarError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -29,6 +34,20 @@ export default function SeguimientoPage() {
   async function marcarPago(id: string) {
     const updated = await patchEnvioEstado(id, "PAGO");
     setEnvios((prev) => prev.map((e) => (e.id === id ? updated : e)));
+  }
+
+  async function handleRefrescar() {
+    setRefrescando(true);
+    setRefrescarError("");
+    try {
+      await refrescarSeguimiento();
+      const data = await getEnviosActivo();
+      setEnvios(data);
+    } catch (e: unknown) {
+      setRefrescarError(e instanceof Error ? e.message : "Error al refrescar el seguimiento");
+    } finally {
+      setRefrescando(false);
+    }
   }
 
   function handleTabChange(value: string) {
@@ -48,12 +67,20 @@ export default function SeguimientoPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex items-baseline gap-3">
-        <h1 className="text-xl font-semibold text-foreground">Seguimiento</h1>
-        <span className="text-sm text-muted-foreground">
-          Estado de respuesta de los mails del ciclo activo
-        </span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold text-foreground">Seguimiento</h1>
+          <span className="text-sm text-muted-foreground">
+            Estado de respuesta de los mails del ciclo activo
+          </span>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefrescar} disabled={refrescando}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refrescando ? "animate-spin" : ""}`} />
+          {refrescando ? "Revisando..." : "Refrescar ahora"}
+        </Button>
       </div>
+
+      {refrescarError && <p className="text-sm text-destructive">{refrescarError}</p>}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
