@@ -5,10 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Button } from "../components/ui/button";
 import { EnvioCard } from "../components/envios/EnvioCard";
 import { EnvioDrawer } from "../components/envios/EnvioDrawer";
-import { getEnviosActivo } from "../services/ciclos";
+import { getEnviosActivo, getCiclos, getEnviosDeCiclo } from "../services/ciclos";
 import { patchEnvioEstado } from "../services/envios";
-import { refrescarSeguimiento } from "../services/seguimiento";
-import type { Envio } from "../types/domain";
+import { refrescarSeguimiento, getRespuestasTardias } from "../services/seguimiento";
+import type { Envio, CicloResumen, RespuestasTardias } from "../types/domain";
 
 const PATH_TO_TAB: Record<string, string> = {
   "/seguimiento/no-contestados": "no_contestados",
@@ -22,6 +22,10 @@ export default function SeguimientoPage() {
   const [selected, setSelected] = useState<Envio | null>(null);
   const [refrescando, setRefrescando] = useState(false);
   const [refrescarError, setRefrescarError] = useState("");
+  const [ciclos, setCiclos] = useState<CicloResumen[]>([]);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState<string>("activo");
+  const [tardias, setTardias] = useState<RespuestasTardias | null>(null);
+  const [tardiasDismissed, setTardiasDismissed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -29,7 +33,23 @@ export default function SeguimientoPage() {
 
   useEffect(() => {
     getEnviosActivo().then(setEnvios).catch(console.error);
+    getCiclos().then(setCiclos).catch(console.error);
+    getRespuestasTardias()
+      .then((t) => {
+        setTardias(t);
+        const firma = `tardias:${t.count}`;
+        setTardiasDismissed(localStorage.getItem("seg_tardias_dismissed") === firma);
+      })
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (cicloSeleccionado === "activo") {
+      getEnviosActivo().then(setEnvios).catch(console.error);
+    } else {
+      getEnviosDeCiclo(cicloSeleccionado).then(setEnvios).catch(console.error);
+    }
+  }, [cicloSeleccionado]);
 
   async function marcarPago(id: string) {
     const updated = await patchEnvioEstado(id, "PAGO");
@@ -41,13 +61,20 @@ export default function SeguimientoPage() {
     setRefrescarError("");
     try {
       await refrescarSeguimiento();
-      const data = await getEnviosActivo();
+      const data =
+        cicloSeleccionado === "activo" ? await getEnviosActivo() : await getEnviosDeCiclo(cicloSeleccionado);
       setEnvios(data);
     } catch (e: unknown) {
       setRefrescarError(e instanceof Error ? e.message : "Error al refrescar el seguimiento");
     } finally {
       setRefrescando(false);
     }
+  }
+
+  function dismissTardias() {
+    if (!tardias) return;
+    localStorage.setItem("seg_tardias_dismissed", `tardias:${tardias.count}`);
+    setTardiasDismissed(true);
   }
 
   function handleTabChange(value: string) {
@@ -79,6 +106,46 @@ export default function SeguimientoPage() {
           {refrescando ? "Revisando..." : "Refrescar ahora"}
         </Button>
       </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-muted-foreground">Ciclo:</label>
+        <select
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          value={cicloSeleccionado}
+          onChange={(e) => setCicloSeleccionado(e.target.value)}
+        >
+          <option value="activo">Ciclo actual</option>
+          {ciclos
+            .filter((c) => !c.activo)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                Ciclo #{c.numero} — {new Date(c.creado_en).toLocaleDateString("es-AR")}
+              </option>
+            ))}
+        </select>
+      </div>
+
+      {tardias && tardias.count > 0 && !tardiasDismissed && (
+        <div className="flex items-start justify-between gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-text">
+          <span>
+            {tardias.count} respuesta{tardias.count === 1 ? "" : "s"} nueva{tardias.count === 1 ? "" : "s"} en
+            ciclos anteriores:{" "}
+            {tardias.ciclos.map((c, idx) => (
+              <button
+                key={c.ciclo_id}
+                type="button"
+                className="underline"
+                onClick={() => setCicloSeleccionado(c.ciclo_id)}
+              >
+                {idx > 0 ? ", " : ""}Ciclo #{c.numero} ({c.count})
+              </button>
+            ))}
+          </span>
+          <button type="button" onClick={dismissTardias} aria-label="Cerrar aviso" className="shrink-0">
+            ✕
+          </button>
+        </div>
+      )}
 
       {refrescarError && <p className="text-sm text-destructive">{refrescarError}</p>}
 
