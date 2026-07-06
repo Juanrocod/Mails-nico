@@ -7,11 +7,15 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.cliente_maestro import ClienteMaestro
+from app.models.ciclo import Ciclo
+from app.models.envio import Envio
 from app.schemas.maestro import (
     ClienteMaestroSchema,
     ClienteMaestroUpdate,
     ClienteMaestroCreate,
     MaestroUploadResponse,
+    HistorialItemSchema,
+    HistorialClienteResponse,
 )
 from app.services.excel_parser import parse_maestro, ExcelParseError
 from app.services.maestro_service import merge_maestro, crear_cliente_manual
@@ -51,6 +55,42 @@ def crear_cliente(
         return crear_cliente_manual(db, payload.clave_union, payload.nombre, payload.email, payload.localidad)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.get("/{clave_union}/historial", response_model=HistorialClienteResponse)
+def historial_cliente(
+    clave_union: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cliente = db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == clave_union).first()
+    rows = (
+        db.query(Envio, Ciclo)
+        .join(Ciclo, Envio.ciclo_id == Ciclo.id)
+        .filter(Envio.clave_union == clave_union)
+        .order_by(Ciclo.numero.desc())
+        .all()
+    )
+    if cliente is None and not rows:
+        raise HTTPException(status_code=404, detail="No hay cliente ni envios con esa clave")
+
+    items = [
+        HistorialItemSchema(
+            envio_id=envio.id,
+            ciclo=ciclo.numero,
+            ciclo_activo=ciclo.activo,
+            fecha=ciclo.creado_en,
+            monto=envio.monto,
+            estado=envio.estado,
+            motivo_filtrado=envio.motivo_filtrado,
+            recibio_mail=envio.message_id is not None,
+            reply_en=envio.reply_en,
+            saldado_en=envio.saldado_en,
+            racha=envio.ciclo_numero,
+        )
+        for envio, ciclo in rows
+    ]
+    return HistorialClienteResponse(cliente=cliente, clave_union=clave_union, items=items)
 
 
 @router.put("/{cliente_id}", response_model=ClienteMaestroSchema)

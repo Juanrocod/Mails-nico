@@ -210,3 +210,77 @@ def test_crear_cliente_nombre_vacio_rechaza(client, auth_headers):
 def test_crear_cliente_requiere_auth(client):
     r = client.post("/maestro", json={"clave_union": "C034", "nombre": "X"})
     assert r.status_code in (401, 403)
+
+
+def test_historial_de_cliente_cross_ciclo(client, auth_headers, db):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    db.add(ClienteMaestro(clave_union="HIS-CLI", nombre="Consorcio Historial",
+                          email="hiscli@mail.com", actualizado_en=datetime.now(timezone.utc)))
+    ciclos = []
+    for numero in (9301, 9302):
+        c = Ciclo(numero=numero, activo=(numero == 9302), creado_en=datetime.now(timezone.utc))
+        db.add(c)
+        db.flush()
+        ciclos.append(c)
+        db.add(Envio(
+            ciclo_id=c.id, ciclo_numero=numero - 9300, clave_union="HIS-CLI",
+            nombre_consorcio="Consorcio Historial", email="hiscli@mail.com",
+            monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+            message_id="<x@mail.com>" if numero == 9301 else None,
+            actualizado_en=datetime.now(timezone.utc),
+        ))
+    db.commit()
+
+    r = client.get("/maestro/HIS-CLI/historial", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["cliente"]["nombre"] == "Consorcio Historial"
+    assert len(data["items"]) == 2
+    assert data["items"][0]["ciclo"] == 9302  # descendente
+    assert data["items"][0]["ciclo_activo"] is True
+    assert data["items"][1]["recibio_mail"] is True
+
+    for c in ciclos:
+        db.query(Envio).filter(Envio.ciclo_id == c.id).delete(synchronize_session=False)
+        db.query(Ciclo).filter(Ciclo.id == c.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "HIS-CLI").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_historial_de_clave_sin_maestro(client, auth_headers, db):
+    """Una clave con envios pero sin registro en el Maestro devuelve cliente=None."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    ciclo = Ciclo(numero=9303, activo=False, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    db.add(Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="HIS-SIN", nombre_consorcio="Sin Maestro",
+        monto=Decimal("500"), estado=EstadoEnvio.SIN_EMAIL,
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    r = client.get("/maestro/HIS-SIN/historial", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["cliente"] is None
+    assert data["clave_union"] == "HIS-SIN"
+    assert len(data["items"]) == 1
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_historial_clave_inexistente_404(client, auth_headers):
+    r = client.get("/maestro/NO-EXISTE-999/historial", headers=auth_headers)
+    assert r.status_code == 404

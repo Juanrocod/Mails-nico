@@ -1,8 +1,11 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, field_validator
 
 from app.core.validators import is_valid_email
+from app.models.envio import EstadoEnvio, MotivoFiltrado
 
 
 class ClienteMaestroSchema(BaseModel):
@@ -43,6 +46,26 @@ class ClienteMaestroUpdate(BaseModel):
         if v is not None and v.strip() and not is_valid_email(v.strip()):
             raise ValueError("El email no tiene un formato válido")
         return v
+
+
+class HistorialItemSchema(BaseModel):
+    envio_id: UUID
+    ciclo: int
+    ciclo_activo: bool
+    fecha: datetime
+    monto: Decimal
+    estado: EstadoEnvio
+    motivo_filtrado: Optional[MotivoFiltrado] = None
+    recibio_mail: bool
+    reply_en: Optional[datetime] = None
+    saldado_en: Optional[datetime] = None
+    racha: int
+
+
+class HistorialClienteResponse(BaseModel):
+    cliente: Optional[ClienteMaestroSchema] = None
+    clave_union: str
+    items: list[HistorialItemSchema]
 
 
 class ClienteMaestroCreate(BaseModel):
