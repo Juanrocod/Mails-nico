@@ -180,10 +180,31 @@ export default function NuevoEnvioPage() {
       </div>
 
       {revisando && (
-        <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-secondary/40 p-3">
-          <p className="text-sm text-muted-foreground">
-            Sin confirmar todavía — revisá las 3 solapas y confirmá cuando esté todo bien.
-          </p>
+        <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-secondary/40 p-3">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              Sin confirmar todavía — revisá las 3 solapas y confirmá cuando esté todo bien.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {previewData!.nuevos} nuevo{previewData!.nuevos === 1 ? "" : "s"} ·{" "}
+              {previewData!.repiten} repite{previewData!.repiten === 1 ? "" : "n"} del ciclo anterior ·{" "}
+              {previewData!.a_saldar} se dará{previewData!.a_saldar === 1 ? "" : "n"} por saldado
+              {previewData!.a_saldar === 1 ? "" : "s"}
+            </p>
+            {previewData!.duplicados > 0 && (
+              <p className="text-sm text-warning-text">
+                ⚠ {previewData!.duplicados} fila{previewData!.duplicados === 1 ? "" : "s"} con clave repetida en
+                el Excel — se usó la última de cada una.
+              </p>
+            )}
+            {previewData!.total_ciclo_anterior > 0 &&
+              previewData!.a_saldar > previewData!.total_ciclo_anterior / 2 && (
+                <p className="text-sm font-medium text-warning-text">
+                  ⚠ Más de la mitad de los deudores del ciclo anterior desaparecerían con este Excel. Si no es lo
+                  esperado, revisá que no sea un archivo viejo o incompleto antes de confirmar.
+                </p>
+              )}
+          </div>
           <div className="flex gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={clearPreview}>
               Cancelar
