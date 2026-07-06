@@ -40,6 +40,12 @@ def _usar_sesion_de_test(db, monkeypatch):
     monkeypatch.setattr(db, "close", lambda: None)
 
 
+def _cleanup(db, ciclo):
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
 def test_poll_inbox_sin_envios_activos_no_conecta(db, monkeypatch):
     _usar_sesion_de_test(db, monkeypatch)
     with patch("app.services.imap_watcher.imaplib.IMAP4_SSL") as mock_imap:
@@ -60,6 +66,8 @@ def test_poll_inbox_usa_host_yahoo_por_default(db, monkeypatch):
 
     mock_imap.assert_called_once_with("imap.mail.yahoo.com", 993, timeout=imap_watcher._IMAP_TIMEOUT_SECONDS)
 
+    _cleanup(db, ciclo)
+
 
 def test_poll_inbox_usa_host_gmail_cuando_esta_activo(db, monkeypatch):
     _usar_sesion_de_test(db, monkeypatch)
@@ -74,6 +82,8 @@ def test_poll_inbox_usa_host_gmail_cuando_esta_activo(db, monkeypatch):
         imap_watcher._poll_inbox()
 
     mock_imap.assert_called_once_with("imap.gmail.com", 993, timeout=imap_watcher._IMAP_TIMEOUT_SECONDS)
+
+    _cleanup(db, ciclo)
 
 
 def test_poll_inbox_mailbox_lookback_days_acota_el_since_pero_no_los_envios_activos(db, monkeypatch):
@@ -101,3 +111,5 @@ def test_poll_inbox_mailbox_lookback_days_acota_el_since_pero_no_los_envios_acti
     since_arg = mock_conn.search.call_args.args[1]
     fecha_ayer = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
     assert fecha_ayer in since_arg
+
+    _cleanup(db, ciclo)

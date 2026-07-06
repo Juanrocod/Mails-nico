@@ -32,6 +32,13 @@ def _make_ciclo(db):
     return c
 
 
+def _cleanup(db, ciclo):
+    from app.models.ciclo import Ciclo
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
 def test_enviar_ciclo_actualiza_estado_a_no_contestado(db, plantilla_default):
     ciclo = _make_ciclo(db)
     envio = _make_envio_db(db, ciclo, "C001", "Consorcio", "test@mail.com", 5000)
@@ -53,6 +60,8 @@ def test_enviar_ciclo_actualiza_estado_a_no_contestado(db, plantilla_default):
     assert envio.enviado_en is not None
     assert envio.id in progreso
 
+    _cleanup(db, ciclo)
+
 
 def test_enviar_ciclo_respeta_rate_limit(db, plantilla_default):
     ciclo = _make_ciclo(db)
@@ -73,6 +82,8 @@ def test_enviar_ciclo_respeta_rate_limit(db, plantilla_default):
     assert len(calls) == 4
     mock_sleep.assert_called_once()
 
+    _cleanup(db, ciclo)
+
 
 def test_enviar_ciclo_usa_host_yahoo_por_default(db, plantilla_default):
     ciclo = _make_ciclo(db)
@@ -92,6 +103,8 @@ def test_enviar_ciclo_usa_host_yahoo_por_default(db, plantilla_default):
     assert args[4] == 587
     db.refresh(envio)
     assert envio.proveedor == "yahoo"
+
+    _cleanup(db, ciclo)
 
 
 def test_enviar_ciclo_usa_host_gmail_cuando_esta_activo(db, plantilla_default):
@@ -115,6 +128,8 @@ def test_enviar_ciclo_usa_host_gmail_cuando_esta_activo(db, plantilla_default):
     assert args[4] == 587
     db.refresh(envio)
     assert envio.proveedor == "gmail"
+
+    _cleanup(db, ciclo)
 
 
 def test_enviar_ciclo_propaga_error_si_falla_config(db, plantilla_default):
@@ -163,3 +178,5 @@ def test_enviar_ciclo_comparte_rate_limit_entre_invocaciones(db, plantilla_defau
         )
 
     mock_sleep.assert_called_once()
+
+    _cleanup(db, ciclo)

@@ -94,6 +94,10 @@ def test_patch_envio_estado_contestado_a_pago(client, auth_headers, db, plantill
     assert r.status_code == 200
     assert r.json()["estado"] == "PAGO"
 
+    db.query(Envio).filter(Envio.id == envio.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
 
 def test_confirmar_ciclo(client, auth_headers, db, plantilla_default):
     """POST /ciclos/confirmar creates Ciclo + Envios with correct estados and streams SSE."""
@@ -148,8 +152,11 @@ def test_confirmar_ciclo(client, auth_headers, db, plantilla_default):
     assert by_clave["C102"].estado == EstadoEnvio.FILTRADO
     assert by_clave["C199"].estado == EstadoEnvio.SIN_EMAIL
 
-    # The router's db.commit() also committed the seeded ClienteMaestro rows.
-    # Remove them so downstream tests (test_maestro.py) see a clean maestro table.
+    # The router's db.commit() also committed the seeded ClienteMaestro rows,
+    # plus the Ciclo/Envios themselves. Remove them all so downstream tests
+    # (test_maestro.py, test_dashboard.py) see a clean maestro/ciclos table.
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
     db.query(ClienteMaestro).filter(
         ClienteMaestro.clave_union.in_(["C101", "C102"])
     ).delete(synchronize_session=False)
@@ -230,6 +237,14 @@ def test_confirmar_ciclo_informa_error_si_falla_el_envio(client, auth_headers, d
     assert r.status_code == 200
     assert '"error"' in r.text
 
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio
+
+    db.expire_all()
+    ciclo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    db.query(Envio).filter(Envio.clave_union == "C150").delete(synchronize_session=False)
+    if ciclo is not None:
+        db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
     db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C150").delete(synchronize_session=False)
     db.commit()
 
@@ -281,6 +296,10 @@ def test_reenviar_envio_cliente_invalido_400(client, auth_headers, db, plantilla
     r = client.post(f"/envios/{envio.id}/reenviar", headers=auth_headers)
     assert r.status_code == 400
     assert "Maestro" in r.json()["detail"]
+
+    db.delete(envio)
+    db.delete(ciclo)
+    db.commit()
 
 
 def test_reenviar_envio_exitoso(client, auth_headers, db, plantilla_default):
