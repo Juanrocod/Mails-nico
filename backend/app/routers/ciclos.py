@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.ciclo import PreviewItem, PreviewResponse
 from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
+from app.services.ciclo_service import marcar_saldados
 from app.services.excel_joiner import join_deudores, revalidar_para_reenvio, revalidar_lote_para_reenvio
 from app.services.excel_parser import parse_deudores, ExcelParseError
 from app.services.smtp_sender import enviar_ciclo, ids_en_proceso
@@ -97,11 +98,13 @@ async def confirmar_ciclo(
     plantilla = db_config.load_plantilla(db)
     preview = join_deudores(db, deudores, plantilla.monto_minimo)
 
-    # Desactivar ciclo anterior si existe
+    # Desactivar ciclo anterior si existe, y marcar saldados a los deudores
+    # que no reaparecen en el Excel nuevo (inferencia de pago por ausencia).
     ciclo_anterior = db.query(Ciclo).filter(Ciclo.activo == True).first()
     if ciclo_anterior:
         ciclo_anterior.activo = False
         db.add(ciclo_anterior)
+        marcar_saldados(db, ciclo_anterior.id, {d.clave_union for d in deudores})
 
     ultimo_num = db.query(Ciclo).count()
     nuevo_ciclo = Ciclo(numero=ultimo_num + 1, activo=True, creado_en=datetime.now(timezone.utc))

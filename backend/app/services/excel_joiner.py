@@ -34,7 +34,8 @@ def _ciclos_consecutivos_deudor(db: Session, clave_union: str) -> int:
         .order_by(Envio.ciclo_numero.desc())
         .first()
     )
-    if last is None or last.estado == EstadoEnvio.PAGO:
+    # PAGO manual o saldado inferido = racha rota: la proxima deuda arranca de cero.
+    if last is None or last.estado == EstadoEnvio.PAGO or last.saldado_en is not None:
         return 0
     return last.ciclo_numero
 
