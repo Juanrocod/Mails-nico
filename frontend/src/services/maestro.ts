@@ -1,5 +1,5 @@
 import { apiFetch } from "./api";
-import type { ClienteMaestro } from "../types/domain";
+import type { ClienteMaestro, HistorialCliente } from "../types/domain";
 
 export async function uploadMaestro(file: File): Promise<{ nuevos: number; actualizados: number; total: number }> {
   const form = new FormData();
@@ -52,5 +52,11 @@ export async function createCliente(data: {
       : err.detail;
     throw new Error(detail ?? "Error creando el cliente");
   }
+  return r.json();
+}
+
+export async function getHistorialCliente(claveUnion: string): Promise<HistorialCliente> {
+  const r = await apiFetch(`/maestro/${encodeURIComponent(claveUnion)}/historial`);
+  if (!r.ok) throw new Error("Error cargando el historial del cliente");
   return r.json();
 }

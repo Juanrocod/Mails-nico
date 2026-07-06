@@ -1,5 +1,5 @@
 import { apiFetch, getAccessToken } from "./api";
-import type { Envio, PreviewCiclo } from "../types/domain";
+import type { Envio, PreviewCiclo, CicloResumen } from "../types/domain";
 
 export async function previewCiclo(file: File): Promise<PreviewCiclo> {
   const form = new FormData();
@@ -126,4 +126,16 @@ export function reenviarFallidos(
     });
 
   return () => controller.abort();
+}
+
+export async function getCiclos(): Promise<CicloResumen[]> {
+  const r = await apiFetch("/ciclos");
+  if (!r.ok) throw new Error("Error cargando el historial de ciclos");
+  return r.json();
+}
+
+export async function getEnviosDeCiclo(cicloId: string): Promise<Envio[]> {
+  const r = await apiFetch(`/ciclos/${cicloId}/envios`);
+  if (!r.ok) throw new Error("Error cargando los envíos del ciclo");
+  return r.json();
 }
