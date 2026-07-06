@@ -30,6 +30,18 @@ _SMTP_TIMEOUT_SECONDS = 15  # evita que una conexion/login colgado trabe todo el
 _send_timestamps: "Deque[float]" = deque()
 _rate_limit_lock = asyncio.Lock()
 
+# IDs de Envio que estan siendo procesados AHORA MISMO por alguna llamada a
+# enviar_ciclo (masiva o individual) -- incluye los que todavia no llegaron a
+# su turno por el rate limit, no solo los que ya se intentaron. Sirve para que
+# el frontend no los muestre como "fallidos para reenviar" mientras en
+# realidad estan en cola de un envio en curso, y para que un reenvio
+# individual/masivo no pise un envio que ya esta siendo mandado.
+_ids_en_proceso: set = set()
+
+
+def ids_en_proceso() -> set:
+    return set(_ids_en_proceso)
+
 
 async def _esperar_turno_rate_limit(batch_size: int, window_seconds: float) -> None:
     async with _rate_limit_lock:
@@ -73,39 +85,44 @@ async def enviar_ciclo(
         ) from exc
 
     loop = asyncio.get_running_loop()
+    ids = {envio.id for envio in envios}
+    _ids_en_proceso.update(ids)
 
-    for envio in envios:
-        await _esperar_turno_rate_limit(batch_size, batch_wait)
+    try:
+        for envio in envios:
+            await _esperar_turno_rate_limit(batch_size, batch_wait)
 
-        try:
-            parsed = EnvioParsed(
-                clave_union=envio.clave_union,
-                nombre=envio.nombre_consorcio,
-                email=envio.email,
-                localidad=None,
-                monto=envio.monto,
-                ciclo_numero_anterior=envio.ciclo_numero - 1,
-            )
-            msg = generate_email(parsed, plantilla, unsubscribe_base_url=settings.BACKEND_PUBLIC_URL)
-            msg["From"] = from_email
-            msg_id = f"<{uuid.uuid4().hex}@{provider.message_id_domain}>"
-            msg["Message-ID"] = msg_id
+            try:
+                parsed = EnvioParsed(
+                    clave_union=envio.clave_union,
+                    nombre=envio.nombre_consorcio,
+                    email=envio.email,
+                    localidad=None,
+                    monto=envio.monto,
+                    ciclo_numero_anterior=envio.ciclo_numero - 1,
+                )
+                msg = generate_email(parsed, plantilla, unsubscribe_base_url=settings.BACKEND_PUBLIC_URL)
+                msg["From"] = from_email
+                msg_id = f"<{uuid.uuid4().hex}@{provider.message_id_domain}>"
+                msg["Message-ID"] = msg_id
 
-            returned_id = await loop.run_in_executor(
-                None,
-                _send_single_email,
-                msg,
-                from_email,
-                app_password,
-                provider.smtp_host,
-                provider.smtp_port,
-            )
-            envio.message_id = returned_id or msg_id
-            envio.enviado_en = datetime.now(timezone.utc)
-            envio.proveedor = proveedor_nombre
-            db.add(envio)
-            db.commit()
-            await on_progress(envio)
-            _logger.info("Enviado a %s (message_id=%s)", envio.email, envio.message_id)
-        except Exception:
-            _logger.error("Error enviando a %s\n%s", envio.email, traceback.format_exc())
+                returned_id = await loop.run_in_executor(
+                    None,
+                    _send_single_email,
+                    msg,
+                    from_email,
+                    app_password,
+                    provider.smtp_host,
+                    provider.smtp_port,
+                )
+                envio.message_id = returned_id or msg_id
+                envio.enviado_en = datetime.now(timezone.utc)
+                envio.proveedor = proveedor_nombre
+                db.add(envio)
+                db.commit()
+                await on_progress(envio)
+                _logger.info("Enviado a %s (message_id=%s)", envio.email, envio.message_id)
+            except Exception:
+                _logger.error("Error enviando a %s\n%s", envio.email, traceback.format_exc())
+    finally:
+        _ids_en_proceso.difference_update(ids)

@@ -24,6 +24,7 @@ export interface Envio {
   tiene_adjunto: boolean;
   enviado_en: string | null;
   actualizado_en: string;
+  en_proceso: boolean;
 }
 
 export interface PreviewItem {

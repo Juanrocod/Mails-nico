@@ -390,3 +390,140 @@ def test_reenviar_fallidos_mezcla_elegibles_e_inelegibles(client, auth_headers, 
     db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
     db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C210").delete(synchronize_session=False)
     db.commit()
+
+
+def test_get_envios_activo_marca_en_proceso(client, auth_headers, db, plantilla_default):
+    """Un Envio cuyo id esta en smtp_sender.ids_en_proceso() (un envio en
+    curso todavia no le llego el turno) tiene que aparecer con en_proceso=True,
+    para que el frontend no lo trate como "fallido" listo para reenviar."""
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.services import smtp_sender
+
+    db.query(Ciclo).update({"activo": False})
+    db.flush()
+    ciclo = Ciclo(numero=401, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=401, clave_union="C401", nombre_consorcio="En Curso",
+        email="encurso@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    smtp_sender._ids_en_proceso.add(envio.id)
+    try:
+        r = client.get("/ciclos/activo/envios", headers=auth_headers)
+    finally:
+        smtp_sender._ids_en_proceso.discard(envio.id)
+
+    assert r.status_code == 200
+    by_id = {e["id"]: e for e in r.json()}
+    assert by_id[str(envio.id)]["en_proceso"] is True
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_reenviar_envio_rechaza_si_ya_esta_en_proceso(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.services import smtp_sender
+
+    db.add(ClienteMaestro(
+        clave_union="C402", nombre="Consorcio En Curso", email="encurso402@mail.com",
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    ciclo = Ciclo(numero=402, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=402, clave_union="C402", nombre_consorcio="En Curso",
+        email="encurso402@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    smtp_sender._ids_en_proceso.add(envio.id)
+    try:
+        r = client.post(f"/envios/{envio.id}/reenviar", headers=auth_headers)
+    finally:
+        smtp_sender._ids_en_proceso.discard(envio.id)
+
+    assert r.status_code == 409
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "C402").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_reenviar_fallidos_saltea_los_que_ya_estan_en_proceso(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.services import smtp_sender
+
+    db.add(ClienteMaestro(
+        clave_union="C403", nombre="Consorcio Listo", email="listo403@mail.com",
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+    db.add(ClienteMaestro(
+        clave_union="C404", nombre="Consorcio En Curso", email="encurso404@mail.com",
+        actualizado_en=datetime.now(timezone.utc),
+    ))
+
+    db.query(Ciclo).update({"activo": False})
+    db.flush()
+    ciclo = Ciclo(numero=403, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+
+    envio_listo = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=403, clave_union="C403", nombre_consorcio="Consorcio Listo",
+        email="listo403@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    envio_en_curso = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=403, clave_union="C404", nombre_consorcio="Consorcio En Curso",
+        email="encurso404@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio_listo)
+    db.add(envio_en_curso)
+    db.commit()
+
+    smtp_sender._ids_en_proceso.add(envio_en_curso.id)
+    try:
+        with patch("app.services.smtp_sender._send_single_email") as mock_send:
+            mock_send.return_value = "<reenv403@yahoo.com>"
+            r = client.post("/ciclos/activo/reenviar-fallidos", headers=auth_headers)
+    finally:
+        smtp_sender._ids_en_proceso.discard(envio_en_curso.id)
+
+    assert r.status_code == 200
+    body = r.text
+    assert str(envio_en_curso.id) in body
+    assert "otro proceso" in body
+
+    db.expire_all()
+    db.refresh(envio_listo)
+    db.refresh(envio_en_curso)
+    assert envio_listo.message_id == "<reenv403@yahoo.com>"
+    assert envio_en_curso.message_id is None
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(
+        ClienteMaestro.clave_union.in_(["C403", "C404"])
+    ).delete(synchronize_session=False)
+    db.commit()

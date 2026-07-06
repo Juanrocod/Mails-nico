@@ -75,7 +75,10 @@ export default function NuevoEnvioPage() {
     ? previewData!.items_para_enviar.map((i) => ({ key: i.clave_union, ...i }))
     : [];
   const fallidos: Envio[] = !revisando
-    ? enviosActivo.filter((e) => e.estado === "NO_CONTESTADO" && e.email && !e.message_id)
+    ? enviosActivo.filter((e) => e.estado === "NO_CONTESTADO" && e.email && !e.message_id && !e.en_proceso)
+    : [];
+  const enviandose: Envio[] = !revisando
+    ? enviosActivo.filter((e) => e.estado === "NO_CONTESTADO" && e.email && !e.message_id && e.en_proceso)
     : [];
   const enviados: Envio[] = enviosActivo.filter((e) => e.message_id);
   const sinEmail: TableRow[] = revisando
@@ -242,14 +245,23 @@ export default function NuevoEnvioPage() {
               }
             />
           ) : (
-            <FallidosTable
-              envios={fallidos}
-              loading={initialLoading}
-              reenviandoId={reenviandoId}
-              onReenviar={handleReenviar}
-              onReenviarTodos={handleReenviarTodos}
-              reenviandoTodos={reenviandoTodos}
-            />
+            <>
+              {enviandose.length > 0 && (
+                <p className="pt-2 text-sm text-muted-foreground">
+                  {enviandose.length} mail{enviandose.length === 1 ? "" : "s"} todavía se está
+                  {enviandose.length === 1 ? "" : "n"} mandando en un envío en curso — no aparece
+                  {enviandose.length === 1 ? "" : "n"} acá para evitar mandarlo{enviandose.length === 1 ? "" : "s"} dos veces.
+                </p>
+              )}
+              <FallidosTable
+                envios={fallidos}
+                loading={initialLoading}
+                reenviandoId={reenviandoId}
+                onReenviar={handleReenviar}
+                onReenviarTodos={handleReenviarTodos}
+                reenviandoTodos={reenviandoTodos}
+              />
+            </>
           )}
         </TabsContent>
         <TabsContent value="enviados">

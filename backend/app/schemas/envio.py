@@ -24,6 +24,7 @@ class EnvioSchema(BaseModel):
     tiene_adjunto: bool
     enviado_en: Optional[datetime]
     actualizado_en: datetime
+    en_proceso: bool = False
 
     model_config = {"from_attributes": True}
 

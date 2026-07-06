@@ -18,7 +18,7 @@ from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
 from app.services.excel_joiner import join_deudores, revalidar_para_reenvio, revalidar_lote_para_reenvio
 from app.services.excel_parser import parse_deudores, ExcelParseError
-from app.services.smtp_sender import enviar_ciclo
+from app.services.smtp_sender import enviar_ciclo, ids_en_proceso
 
 router = APIRouter(tags=["ciclos"])
 _logger = logging.getLogger("mails_nico.ciclos")
@@ -205,7 +205,13 @@ def get_envios_activo(
     ciclo = db.query(Ciclo).filter(Ciclo.activo == True).first()
     if not ciclo:
         return []
-    return list(ciclo.envios)
+    en_proceso = ids_en_proceso()
+    result = []
+    for envio in ciclo.envios:
+        schema = EnvioSchema.model_validate(envio)
+        schema.en_proceso = envio.id in en_proceso
+        result.append(schema)
+    return result
 
 
 @router.patch("/envios/{envio_id}/estado", response_model=EnvioSchema)
@@ -239,6 +245,8 @@ async def reenviar_envio(
         raise HTTPException(status_code=404, detail="Envio no encontrado")
     if envio.estado != EstadoEnvio.NO_CONTESTADO or envio.message_id:
         raise HTTPException(status_code=400, detail="Este envio no esta pendiente de reenvio")
+    if envio.id in ids_en_proceso():
+        raise HTTPException(status_code=409, detail="Este envio ya se esta mandando, esperá a que termine.")
 
     ok, motivo = revalidar_para_reenvio(db, envio)
     if not ok:
@@ -279,7 +287,16 @@ async def reenviar_fallidos(
         .all()
     )
 
+    en_proceso = ids_en_proceso()
+    saltados_en_proceso = [
+        {"id": str(envio.id), "motivo": "Ya se está mandando en otro proceso."}
+        for envio in fallidos
+        if envio.id in en_proceso
+    ]
+    fallidos = [envio for envio in fallidos if envio.id not in en_proceso]
+
     listos, saltados = revalidar_lote_para_reenvio(db, fallidos)
+    saltados = saltados_en_proceso + saltados
 
     async def event_generator():
         error = None
