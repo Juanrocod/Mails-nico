@@ -121,3 +121,15 @@ def parse_maestro(file_bytes: bytes) -> list[MaestroRow]:
             localidad = raw_loc if raw_loc else None
         result.append(MaestroRow(clave_union=clave, nombre=nombre, email=email, localidad=localidad))
     return result
+
+
+def dedupe_deudores(rows: list[DeudorRow]) -> tuple[list[DeudorRow], int]:
+    """
+    Si una clave_union aparece mas de una vez en el Excel, conserva solo la
+    ultima fila (criterio del spec: la ultima pisa a las anteriores).
+    Devuelve (filas unicas en orden de primera aparicion, cantidad descartada).
+    """
+    por_clave: dict[str, DeudorRow] = {}
+    for row in rows:
+        por_clave[row.clave_union] = row
+    return list(por_clave.values()), len(rows) - len(por_clave)

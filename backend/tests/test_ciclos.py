@@ -581,3 +581,82 @@ def test_reenviar_fallidos_saltea_los_que_ya_estan_en_proceso(client, auth_heade
         ClienteMaestro.clave_union.in_(["C403", "C404"])
     ).delete(synchronize_session=False)
     db.commit()
+
+
+def test_dedupe_deudores_conserva_la_ultima_fila():
+    from decimal import Decimal as D
+    from app.services.excel_parser import DeudorRow, dedupe_deudores
+
+    rows = [
+        DeudorRow("DUP-1", "Primero", "CABA", D("100")),
+        DeudorRow("DUP-2", "Otro", "CABA", D("200")),
+        DeudorRow("DUP-1", "Ultimo", "CABA", D("300")),
+    ]
+    unicos, descartados = dedupe_deudores(rows)
+    assert descartados == 1
+    assert len(unicos) == 2
+    por_clave = {r.clave_union: r for r in unicos}
+    assert por_clave["DUP-1"].nombre == "Ultimo"
+    assert por_clave["DUP-1"].monto == D("300")
+
+
+def test_preview_informa_diff_contra_ciclo_activo(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    db.query(Ciclo).update({"activo": False})
+    ciclo = Ciclo(numero=9101, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    for clave in ("DIF-A", "DIF-B"):
+        db.add(Envio(
+            ciclo_id=ciclo.id, ciclo_numero=1, clave_union=clave, nombre_consorcio=clave,
+            email=f"{clave.lower()}@mail.com", monto=Decimal("1000"),
+            estado=EstadoEnvio.NO_CONTESTADO, actualizado_en=datetime.now(timezone.utc),
+        ))
+    db.commit()
+
+    # Nuevo excel: DIF-B repite, DIF-C es nuevo, DIF-A desapareceria (a saldar).
+    # DIF-C va duplicado para verificar el conteo de duplicados.
+    excel = _make_deudores_excel([
+        ["DIF-B", "Repite", "CABA", 1000],
+        ["DIF-C", "Nuevo", "CABA", 500],
+        ["DIF-C", "Nuevo bis", "CABA", 700],
+    ])
+    r = client.post(
+        "/ciclos/preview",
+        files={"file": ("d.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["nuevos"] == 1
+    assert data["repiten"] == 1
+    assert data["a_saldar"] == 1
+    assert data["duplicados"] == 1
+    assert data["total_ciclo_anterior"] == 2
+    assert data["total_deudores"] == 2  # despues del dedupe
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_preview_sin_ciclo_activo_diff_en_cero(client, auth_headers, db, plantilla_default):
+    from app.models.ciclo import Ciclo
+
+    db.query(Ciclo).update({"activo": False})
+    db.commit()
+
+    excel = _make_deudores_excel([["DIF-Z", "Solo", "CABA", 1000]])
+    r = client.post(
+        "/ciclos/preview",
+        files={"file": ("d.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=auth_headers,
+    )
+    data = r.json()
+    assert data["nuevos"] == 1
+    assert data["repiten"] == 0
+    assert data["a_saldar"] == 0
+    assert data["total_ciclo_anterior"] == 0

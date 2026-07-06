@@ -18,7 +18,7 @@ from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
 from app.services.ciclo_service import marcar_saldados
 from app.services.excel_joiner import join_deudores, revalidar_para_reenvio, revalidar_lote_para_reenvio
-from app.services.excel_parser import parse_deudores, ExcelParseError
+from app.services.excel_parser import parse_deudores, dedupe_deudores, ExcelParseError
 from app.services.smtp_sender import enviar_ciclo, ids_en_proceso
 
 router = APIRouter(tags=["ciclos"])
@@ -44,8 +44,16 @@ async def preview_ciclo(
         deudores = parse_deudores(content)
     except ExcelParseError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    deudores, duplicados = dedupe_deudores(deudores)
     plantilla = db_config.load_plantilla(db)
     preview = join_deudores(db, deudores, plantilla.monto_minimo)
+
+    # Diff contra el ciclo activo: que cambia si se confirma este Excel.
+    ciclo_activo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    claves_nuevas = {d.clave_union for d in deudores}
+    claves_anteriores = (
+        {e.clave_union for e in ciclo_activo.envios} if ciclo_activo else set()
+    )
     return PreviewResponse(
         para_enviar=len(preview.para_enviar),
         sin_email=len(preview.sin_email),
@@ -81,6 +89,11 @@ async def preview_ciclo(
             )
             for d, motivo in preview.filtrados
         ],
+        nuevos=len(claves_nuevas - claves_anteriores),
+        repiten=len(claves_nuevas & claves_anteriores),
+        a_saldar=len(claves_anteriores - claves_nuevas),
+        duplicados=duplicados,
+        total_ciclo_anterior=len(claves_anteriores),
     )
 
 
@@ -95,6 +108,7 @@ async def confirmar_ciclo(
         deudores = parse_deudores(content)
     except ExcelParseError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    deudores, _ = dedupe_deudores(deudores)
     plantilla = db_config.load_plantilla(db)
     preview = join_deudores(db, deudores, plantilla.monto_minimo)
 

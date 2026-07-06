@@ -21,3 +21,8 @@ class PreviewResponse(BaseModel):
     items_para_enviar: list[PreviewItem]
     items_sin_email: list[PreviewItem]
     items_filtrados: list[PreviewItem]
+    nuevos: int
+    repiten: int
+    a_saldar: int
+    duplicados: int
+    total_ciclo_anterior: int
