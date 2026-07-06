@@ -20,6 +20,7 @@ El flujo core (subir Excel → preview → confirmar → SMTP con rate limit →
 - **Refresco manual de Seguimiento** — botón "Refrescar ahora" dispara un poll IMAP al toque (ventana de 1 día, rápido) en vez de esperar los 10 min del poll automático (que sigue escaneando 30 días completos).
 - **Envío robusto a desconexión del cliente** — el envío de fondo sobrevive a un F5/navegación (no se corta), la barra de progreso se reconstruye sola desde el estado real si se pierde la conexión en vivo, y los envíos todavía en cola durante un envío masivo no aparecen como "fallidos para reenviar" (evita reenvíos duplicados accidentales).
 - **Aviso de "envío completado"** — cartel verde con el conteo real de enviados (no el intentado) al terminar un envío masivo o un reenvío en bloque, distinguiendo éxito total de parcial.
+- **Dashboard de cobranza e historial** — KPIs (deuda, deudores, cobrado, efectividad), rankings (monto / morosos crónicos), evolución por ciclo, perfil histórico por cliente (`/clientes/:clave`), selector de ciclos pasados en Seguimiento, aviso de respuestas tardías, inferencia de pago por ausencia (`saldado_en`, migración 0006), dedupe de claves duplicadas y diff del Excel contra el ciclo activo en el preview. Spec: `docs/superpowers/specs/2026-07-06-dashboard-cobranza-design.md`.
 
 ---
 
