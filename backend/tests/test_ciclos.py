@@ -392,6 +392,60 @@ def test_reenviar_fallidos_mezcla_elegibles_e_inelegibles(client, auth_headers, 
     db.commit()
 
 
+def test_send_task_sobrevive_a_cancelacion_del_stream(db, plantilla_default):
+    """Si el generador SSE que consume _stream_envios se cancela (el cliente
+    se desconecta o recarga la pagina a mitad de un envio), send_task no se
+    tiene que perder -- antes, al no tener mas referencia fuerte que la
+    variable local del generador cancelado, asyncio podia recolectarlo (y
+    cancelarlo) a mitad de camino."""
+    import asyncio
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+    from app.routers.ciclos import _stream_envios
+
+    ciclo = Ciclo(numero=1, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="C600", nombre_consorcio="Consorcio",
+        email="test@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    async def _run():
+        resultado: dict = {}
+
+        async def consumir():
+            async for _ in _stream_envios([envio], db, resultado):
+                pass
+
+        loop = asyncio.get_event_loop()
+        consumer_task = loop.create_task(consumir())
+        await asyncio.sleep(0.05)  # dejar que arranque y cree send_task de fondo
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            pass
+        # dar tiempo a que send_task, si sobrevivio a la cancelacion, termine
+        await asyncio.sleep(0.5)
+
+    with patch("app.services.smtp_sender._send_single_email") as mock_send:
+        mock_send.return_value = "<sobrevivio@yahoo.com>"
+        asyncio.get_event_loop().run_until_complete(_run())
+
+    db.refresh(envio)
+    assert envio.message_id == "<sobrevivio@yahoo.com>"
+
+    db.query(Envio).filter(Envio.id == envio.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
 def test_get_envios_activo_marca_en_proceso(client, auth_headers, db, plantilla_default):
     """Un Envio cuyo id esta en smtp_sender.ids_en_proceso() (un envio en
     curso todavia no le llego el turno) tiene que aparecer con en_proceso=True,

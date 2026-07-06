@@ -37,7 +37,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     ...(options.headers ?? {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const response = await fetch(`${BASE_URL}${path}`, { cache: "no-store", ...options, headers });
 
   const isAuthEndpoint = path === "/auth/login" || path === "/auth/refresh";
   if (response.status === 401 && !isAuthEndpoint) {
@@ -47,6 +47,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
       return response;
     }
     const retryResponse = await fetch(`${BASE_URL}${path}`, {
+      cache: "no-store",
       ...options,
       headers: { ...(options.headers ?? {}), Authorization: `Bearer ${newToken}` },
     });

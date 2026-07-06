@@ -23,6 +23,14 @@ from app.services.smtp_sender import enviar_ciclo, ids_en_proceso
 router = APIRouter(tags=["ciclos"])
 _logger = logging.getLogger("mails_nico.ciclos")
 
+# asyncio solo mantiene referencias debiles a las tareas creadas con
+# create_task: si el generador SSE que las crea se cancela (el cliente se
+# desconecta o recarga la pagina), la unica referencia fuerte a send_task
+# desaparece y el recolector de basura podria matarla a mitad de un envio.
+# Este set las mantiene vivas hasta que terminan solas, sin importar que pase
+# con el stream que las origino.
+_background_send_tasks: set = set()
+
 
 @router.post("/ciclos/preview", response_model=PreviewResponse)
 async def preview_ciclo(
@@ -179,6 +187,8 @@ async def _stream_envios(envios_db: list[Envio], db: Session, resultado: dict):
         await sse_queue.put(f"data: {payload}\n\n")
 
     send_task = asyncio.create_task(enviar_ciclo(envios_db, db, progress_callback))
+    _background_send_tasks.add(send_task)
+    send_task.add_done_callback(_background_send_tasks.discard)
 
     while not send_task.done() or not sse_queue.empty():
         try:
@@ -187,8 +197,10 @@ async def _stream_envios(envios_db: list[Envio], db: Session, resultado: dict):
         except asyncio.QueueEmpty:
             await asyncio.sleep(0.1)
 
-    # Propagate any exception from the send task
-    await send_task
+    # Propagate any exception from the send task. Shielded para que si este
+    # generador se cancela justo aca, el await no le pase la cancelacion a
+    # send_task (que igual sigue vivo gracias a _background_send_tasks).
+    await asyncio.shield(send_task)
     resultado["enviados"] = sent
 
 
