@@ -104,6 +104,29 @@ def test_racha_se_resetea_si_ultimo_envio_esta_saldado(db):
     db.commit()
 
 
+def test_racha_usa_el_envio_mas_reciente_no_el_de_racha_maxima(db):
+    """El orden es por Ciclo.numero (mas reciente), no por Envio.ciclo_numero (racha maxima).
+
+    Historial: en el ciclo 9601 el deudor llego a racha 5 y saldo; en el ciclo
+    9602 (posterior) volvio a deber con racha 1 sin saldar. Con el ordenamiento
+    viejo (Envio.ciclo_numero desc) se tomaria el envio de racha 5 — y como esta
+    saldado devolveria 0. El correcto toma el envio del ciclo mas reciente: 1.
+    """
+    from app.services.excel_joiner import _ciclos_consecutivos_deudor
+
+    ciclo_viejo = _make_ciclo(db, 9601)
+    ciclo_reciente = _make_ciclo(db, 9602)
+    _make_envio(db, ciclo_viejo, "SAL-REC", ciclo_numero=5, saldado_en=datetime.now(timezone.utc))
+    _make_envio(db, ciclo_reciente, "SAL-REC", ciclo_numero=1)
+    db.commit()
+
+    assert _ciclos_consecutivos_deudor(db, "SAL-REC") == 1
+
+    db.query(Envio).filter(Envio.ciclo_id.in_([ciclo_viejo.id, ciclo_reciente.id])).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id.in_([ciclo_viejo.id, ciclo_reciente.id])).delete(synchronize_session=False)
+    db.commit()
+
+
 def test_racha_sigue_si_ultimo_envio_no_saldado(db):
     from app.services.excel_joiner import _ciclos_consecutivos_deudor
 
