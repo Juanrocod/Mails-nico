@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
+  LayoutDashboard,
   Inbox,
   Reply,
   CheckCircle2,
@@ -81,6 +82,10 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+        <NavItem to="/dashboard" label="Dashboard" icon={LayoutDashboard} />
+
+        <Separator className="my-2" />
+
         <NavItem to="/nuevo-envio/para-enviar" label="Nuevo Envío" icon={Send} />
 
         <Separator className="my-2" />

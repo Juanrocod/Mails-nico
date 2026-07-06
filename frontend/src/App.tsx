@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './components/layout/AppLayout'
 import AuthGuard from './components/layout/AuthGuard'
 import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
 import NuevoEnvioPage from './pages/NuevoEnvioPage'
 import SeguimientoPage from './pages/SeguimientoPage'
 import MaestroPage from './pages/MaestroPage'
@@ -14,12 +15,13 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<AuthGuard />}>
         <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/nuevo-envio/*" element={<NuevoEnvioPage />} />
           <Route path="/seguimiento/*" element={<SeguimientoPage />} />
           <Route path="/maestro" element={<MaestroPage />} />
           <Route path="/plantilla" element={<PlantillaPage />} />
           <Route path="/configuracion" element={<ConfiguracionPage />} />
-          <Route path="/" element={<Navigate to="/seguimiento/no-contestados" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
