@@ -2,9 +2,15 @@ import asyncio
 from functools import partial
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.models.ciclo import Ciclo
+from app.models.envio import Envio
 from app.models.user import User
+from app.schemas.seguimiento import RespuestasTardiasCiclo, RespuestasTardiasResponse
 from app.services import imap_watcher
 
 router = APIRouter(prefix="/seguimiento", tags=["seguimiento"])
@@ -29,3 +35,30 @@ async def refrescar_seguimiento(current_user: User = Depends(get_current_user)):
             detail="No se pudo conectar al correo para revisar respuestas. Revisá las credenciales del proveedor de email.",
         ) from exc
     return {"ok": True}
+
+
+@router.get("/respuestas-tardias", response_model=RespuestasTardiasResponse)
+def respuestas_tardias(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Respuestas que llegaron despues de que arranco el ciclo activo pero
+    pertenecen a envios de ciclos anteriores (aterrizan en el envio viejo y
+    serian invisibles desde la vista del ciclo actual)."""
+    ciclo_activo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    if ciclo_activo is None:
+        return RespuestasTardiasResponse(count=0, ciclos=[])
+
+    rows = (
+        db.query(Envio.ciclo_id, Ciclo.numero, func.count(Envio.id))
+        .join(Ciclo, Envio.ciclo_id == Ciclo.id)
+        .filter(
+            Envio.ciclo_id != ciclo_activo.id,
+            Envio.reply_en.isnot(None),
+            Envio.reply_en >= ciclo_activo.creado_en,
+        )
+        .group_by(Envio.ciclo_id, Ciclo.numero)
+        .all()
+    )
+    ciclos = [RespuestasTardiasCiclo(ciclo_id=cid, numero=num, count=cnt) for cid, num, cnt in rows]
+    return RespuestasTardiasResponse(count=sum(c.count for c in ciclos), ciclos=ciclos)
