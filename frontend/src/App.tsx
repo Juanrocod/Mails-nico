@@ -8,6 +8,7 @@ import SeguimientoPage from './pages/SeguimientoPage'
 import MaestroPage from './pages/MaestroPage'
 import PlantillaPage from './pages/PlantillaPage'
 import ConfiguracionPage from './pages/ConfiguracionPage'
+import ClientePerfilPage from './pages/ClientePerfilPage'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/maestro" element={<MaestroPage />} />
           <Route path="/plantilla" element={<PlantillaPage />} />
           <Route path="/configuracion" element={<ConfiguracionPage />} />
+          <Route path="/clientes/:clave" element={<ClientePerfilPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>

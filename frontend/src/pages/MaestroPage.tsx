@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Pencil, Check, X, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,6 +26,7 @@ function motivoInactivo(c: ClienteMaestro): string {
 }
 
 export default function MaestroPage() {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState<ClienteMaestro[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [agregarModalOpen, setAgregarModalOpen] = useState(false);
@@ -190,7 +192,13 @@ export default function MaestroPage() {
                         className="h-8"
                       />
                     ) : (
-                      c.nombre
+                      <button
+                        type="button"
+                        className="text-left hover:underline"
+                        onClick={() => navigate(`/clientes/${encodeURIComponent(c.clave_union)}`)}
+                      >
+                        {c.nombre}
+                      </button>
                     )}
                   </td>
                   <td className="py-2.5 pr-6 text-muted-foreground truncate">

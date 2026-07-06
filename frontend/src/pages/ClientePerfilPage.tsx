@@ -1,0 +1,148 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Button } from "../components/ui/button";
+import { Skeleton } from "../components/ui/skeleton";
+import { getHistorialCliente } from "../services/maestro";
+import type { HistorialCliente } from "../types/domain";
+
+const ESTADO_LABEL: Record<string, string> = {
+  NO_CONTESTADO: "Sin respuesta",
+  CONTESTADO: "Contestó",
+  PAGO: "Pagó",
+  REBOTADO: "Rebotó",
+  SIN_EMAIL: "Sin email",
+  FILTRADO: "Filtrado",
+};
+
+function pesos(n: number): string {
+  return `$${Number(n).toLocaleString("es-AR")}`;
+}
+
+export default function ClientePerfilPage() {
+  const { clave } = useParams<{ clave: string }>();
+  const navigate = useNavigate();
+  const [data, setData] = useState<HistorialCliente | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clave) return;
+    getHistorialCliente(clave)
+      .then(setData)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Error cargando el perfil"))
+      .finally(() => setLoading(false));
+  }, [clave]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Volver
+        </Button>
+        <p className="text-sm text-destructive">{error || "No se encontró el cliente."}</p>
+      </div>
+    );
+  }
+
+  const items = data.items;
+  const actual = items.find((i) => i.ciclo_activo);
+  const totalSaldado = items.filter((i) => i.saldado_en).reduce((acc, i) => acc + Number(i.monto), 0);
+  const conMail = items.filter((i) => i.recibio_mail);
+  const contesto = conMail.filter((i) => i.reply_en).length;
+  const estadoCliente = !data.cliente
+    ? "No está en el Maestro"
+    : data.cliente.prefiere_no_recibir_email
+      ? "Dado de baja"
+      : data.cliente.activo
+        ? "Activo"
+        : "Eliminado";
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-5">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Volver
+      </Button>
+
+      <div>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold text-foreground">
+            {data.cliente?.nombre ?? `Clave ${data.clave_union}`}
+          </h1>
+          <span className="font-mono text-xs text-muted-foreground">{data.clave_union}</span>
+        </div>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {data.cliente?.email ?? "Sin email"} · {data.cliente?.localidad ?? "Sin localidad"} · {estadoCliente}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-md border border-border bg-secondary/30 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Deuda actual</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{actual ? pesos(Number(actual.monto)) : "—"}</p>
+        </div>
+        <div className="rounded-md border border-border bg-secondary/30 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ciclos debiendo</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{actual ? actual.racha : "—"}</p>
+        </div>
+        <div className="rounded-md border border-border bg-secondary/30 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Saldado histórico</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{pesos(totalSaldado)}</p>
+        </div>
+        <div className="rounded-md border border-border bg-secondary/30 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Respuesta a mails</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">
+            {conMail.length === 0 ? "—" : `${contesto}/${conMail.length}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Ciclo</th>
+              <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Fecha</th>
+              <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Monto</th>
+              <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Mail</th>
+              <th className="py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((i) => (
+              <tr key={i.envio_id} className="border-b border-border last:border-0">
+                <td className="py-2.5 pr-4 tabular-nums">#{i.ciclo}{i.ciclo_activo ? " (actual)" : ""}</td>
+                <td className="py-2.5 pr-4 text-muted-foreground">
+                  {format(new Date(i.fecha), "dd/MM/yyyy", { locale: es })}
+                </td>
+                <td className="py-2.5 pr-4 text-right tabular-nums">{pesos(Number(i.monto))}</td>
+                <td className="py-2.5 pr-4 text-muted-foreground">
+                  {i.recibio_mail ? ESTADO_LABEL[i.estado] ?? i.estado : "No se envió"}
+                </td>
+                <td className="py-2.5">
+                  {i.saldado_en
+                    ? `Saldado el ${format(new Date(i.saldado_en), "dd/MM/yyyy", { locale: es })}`
+                    : i.ciclo_activo
+                      ? "Deuda vigente"
+                      : "Siguió debiendo"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
