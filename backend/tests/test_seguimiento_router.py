@@ -6,7 +6,7 @@ def test_refrescar_seguimiento_ok(client, auth_headers):
         r = client.post("/seguimiento/refrescar", headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["ok"] is True
-    mock_poll.assert_called_once()
+    mock_poll.assert_called_once_with(mailbox_lookback_days=1)
 
 
 def test_refrescar_seguimiento_falla_si_poll_inbox_lanza(client, auth_headers):

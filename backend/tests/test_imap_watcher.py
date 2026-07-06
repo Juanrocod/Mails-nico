@@ -58,7 +58,7 @@ def test_poll_inbox_usa_host_yahoo_por_default(db, monkeypatch):
         mock_imap.return_value = mock_conn
         imap_watcher._poll_inbox()
 
-    mock_imap.assert_called_once_with("imap.mail.yahoo.com", 993)
+    mock_imap.assert_called_once_with("imap.mail.yahoo.com", 993, timeout=imap_watcher._IMAP_TIMEOUT_SECONDS)
 
 
 def test_poll_inbox_usa_host_gmail_cuando_esta_activo(db, monkeypatch):
@@ -73,4 +73,31 @@ def test_poll_inbox_usa_host_gmail_cuando_esta_activo(db, monkeypatch):
         mock_imap.return_value = mock_conn
         imap_watcher._poll_inbox()
 
-    mock_imap.assert_called_once_with("imap.gmail.com", 993)
+    mock_imap.assert_called_once_with("imap.gmail.com", 993, timeout=imap_watcher._IMAP_TIMEOUT_SECONDS)
+
+
+def test_poll_inbox_mailbox_lookback_days_acota_el_since_pero_no_los_envios_activos(db, monkeypatch):
+    """El refresco manual pasa mailbox_lookback_days chico para que el SINCE
+    de IMAP sea angosto (rapido), pero un Envio viejo sin contestar sigue
+    entrando en active_envios igual (sino su respuesta nunca se buscaria)."""
+    from datetime import timedelta
+
+    _usar_sesion_de_test(db, monkeypatch)
+    ciclo = _make_ciclo(db)
+    envio_viejo = _make_envio_no_contestado(db, ciclo, "C003", "<viejo@yahoo.com>")
+    envio_viejo.enviado_en = datetime.now(timezone.utc) - timedelta(days=20)
+    db.commit()
+
+    with patch("app.services.imap_watcher.imaplib.IMAP4_SSL") as mock_imap:
+        mock_conn = MagicMock()
+        mock_conn.search.return_value = ("OK", [b""])
+        mock_imap.return_value = mock_conn
+        imap_watcher._poll_inbox(mailbox_lookback_days=1)
+
+    # Se conecto igual (el envio viejo sigue contando como "activo" para
+    # decidir si vale la pena conectarse), pero el SINCE usado es de ~1 dia
+    # atras, no de los 30 dias completos.
+    mock_imap.assert_called_once()
+    since_arg = mock_conn.search.call_args.args[1]
+    fecha_ayer = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
+    assert fecha_ayer in since_arg

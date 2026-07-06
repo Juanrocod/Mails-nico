@@ -12,7 +12,8 @@ from app.services.reply_classifier import classify
 
 _logger = logging.getLogger("mails_nico.imap")
 _POLL_INTERVAL = 600  # 10 minutos
-_SEARCH_WINDOW_DAYS = 30
+_SEARCH_WINDOW_DAYS = 30  # cuanto atras se consideran los Envios "activos" para trackear
+_IMAP_TIMEOUT_SECONDS = 15  # evita que una conexion colgada trabe el poll entero
 
 
 async def run_forever():
@@ -28,20 +29,27 @@ async def run_forever():
         await asyncio.sleep(_POLL_INTERVAL)
 
 
-def _poll_inbox():
+def _poll_inbox(mailbox_lookback_days: int = _SEARCH_WINDOW_DAYS):
     """
     Conexión sincrónica a IMAP para buscar respuestas a Envios activos.
     Se ejecuta en executor para no bloquear el event loop.
+
+    `mailbox_lookback_days` acota cuántos días atrás se escanean MENSAJES en
+    la bandeja (para que un refresco manual sea rápido); qué Envios se
+    consideran "activos" para trackear siempre usa la ventana completa de
+    _SEARCH_WINDOW_DAYS, sin importar este parámetro — así una respuesta a
+    un Envio viejo pero todavía sin contestar no se pierde en un refresco
+    angosto, solo puede tardar hasta el próximo poll automático en detectarse.
     """
     db = SessionLocal()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=_SEARCH_WINDOW_DAYS)
+        cutoff_envios = datetime.now(timezone.utc) - timedelta(days=_SEARCH_WINDOW_DAYS)
         active_envios = (
             db.query(Envio)
             .filter(
                 Envio.message_id.isnot(None),
                 Envio.estado == EstadoEnvio.NO_CONTESTADO,
-                Envio.enviado_en >= cutoff,
+                Envio.enviado_en >= cutoff_envios,
             )
             .all()
         )
@@ -52,12 +60,13 @@ def _poll_inbox():
 
         provider = PROVIDERS[config_service.get_active_provider(db)]
         email_addr, app_password = config_service.get_active_credentials(db)
-        mail = imaplib.IMAP4_SSL(provider.imap_host, provider.imap_port)
+        mail = imaplib.IMAP4_SSL(provider.imap_host, provider.imap_port, timeout=_IMAP_TIMEOUT_SECONDS)
         try:
             mail.login(email_addr, app_password)
             mail.select("INBOX")
 
-            since_date = cutoff.strftime("%d-%b-%Y")
+            cutoff_mensajes = datetime.now(timezone.utc) - timedelta(days=mailbox_lookback_days)
+            since_date = cutoff_mensajes.strftime("%d-%b-%Y")
             _, data = mail.search(None, f'(SINCE "{since_date}")')
             msg_nums = data[0].split()
 
