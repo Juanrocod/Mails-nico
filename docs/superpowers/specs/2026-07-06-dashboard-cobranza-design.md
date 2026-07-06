@@ -151,13 +151,15 @@ Hallazgos del análisis y cómo se resolvieron:
 | 4 | Pagos parciales invisibles para el KPI "cobrado" | Fórmula incluye reducciones de monto de los que repiten |
 | 5 | `ciclo_numero` no reseteaba tras pago inferido → morosos crónicos mal medidos | Reset con `saldado_en` |
 | 6 | Respuestas tardías invisibles desde el ciclo actual | Banner de respuestas tardías |
-| 7 | "Efectividad" leída como causalidad | Wording de correlación en la UI |
-| 8 | Respuesta a mail de >30 días no se detecta | Limitación documentada (v1) |
-| 9 | Cambio de clave en el sistema origen parte el historial | Limitación documentada (v1) |
+| 7 | "Efectividad" leída como causalidad | Wording de correlación en la UI (sin cierre posible: requeriría grupo de control) |
+| 8 | Respuesta a mail de >30 días no se detecta | Limitación documentada (v1) — cierre: subir `_SEARCH_WINDOW_DAYS`, ver Extensiones |
+| 9 | Cambio de clave en el sistema origen parte el historial | Limitación documentada (v1) — cierre: fusión de clientes, ver Extensiones |
+| 10 | "Saldado" es inferencia, no pago confirmado | Limitación documentada (v1) — cierre: datos de pagos reales del sistema del cliente, ver Extensiones |
 
 ## Extensiones futuras (fuera de alcance v1)
 
-- Integración con el sistema del cliente (pagos reales con fecha exacta, API o Excel adicional) — reemplazaría la inferencia por datos duros.
+- Integración con el sistema del cliente (pagos reales con fecha exacta, API o Excel adicional) — reemplazaría la inferencia de "saldado" por datos duros (cierra el hueco #10).
+- Ampliar la ventana de detección de respuestas tardías (`_SEARCH_WINDOW_DAYS` de 30 → 60/90 días) si en la práctica llegan respuestas fuera de ventana (cierra el hueco #8; costo: polls IMAP más lentos).
+- Fusión de clientes en Maestro y/o detección asistida de cambios de clave (nombre igual, clave distinta) (cierra el hueco #9).
 - Multi-plantilla con escalado de tono según antigüedad de la deuda (Fase 2 del spec original) — `ciclo_numero` + `saldado_en` la dejan lista.
 - Export del dashboard (PDF/Excel) para compartir con el contador.
-- Detección asistida de cambios de clave (nombre igual, clave distinta).
