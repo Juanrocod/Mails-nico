@@ -23,6 +23,7 @@ class EnvioSchema(BaseModel):
     reply_en: Optional[datetime]
     tiene_adjunto: bool
     enviado_en: Optional[datetime]
+    saldado_en: Optional[datetime] = None
     actualizado_en: datetime
     en_proceso: bool = False
 
