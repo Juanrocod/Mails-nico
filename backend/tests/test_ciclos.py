@@ -660,3 +660,64 @@ def test_preview_sin_ciclo_activo_diff_en_cero(client, auth_headers, db, plantil
     assert data["repiten"] == 0
     assert data["a_saldar"] == 0
     assert data["total_ciclo_anterior"] == 0
+
+
+def test_listar_ciclos_con_totales(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    ciclo = Ciclo(numero=9201, activo=False, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    for i, monto in enumerate(("1000", "2500")):
+        db.add(Envio(
+            ciclo_id=ciclo.id, ciclo_numero=1, clave_union=f"LST-{i}", nombre_consorcio="X",
+            email=f"lst{i}@mail.com", monto=Decimal(monto), estado=EstadoEnvio.NO_CONTESTADO,
+            actualizado_en=datetime.now(timezone.utc),
+        ))
+    db.commit()
+
+    r = client.get("/ciclos", headers=auth_headers)
+    assert r.status_code == 200
+    por_numero = {c["numero"]: c for c in r.json()}
+    assert por_numero[9201]["total_envios"] == 2
+    assert float(por_numero[9201]["deuda_total"]) == 3500.0
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_envios_de_ciclo_especifico(client, auth_headers, db, plantilla_default):
+    from datetime import datetime, timezone
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    ciclo = Ciclo(numero=9202, activo=False, creado_en=datetime.now(timezone.utc))
+    db.add(ciclo)
+    db.flush()
+    envio = Envio(
+        ciclo_id=ciclo.id, ciclo_numero=1, clave_union="HIS-1", nombre_consorcio="Historico",
+        email="his1@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.CONTESTADO,
+        actualizado_en=datetime.now(timezone.utc),
+    )
+    db.add(envio)
+    db.commit()
+
+    r = client.get(f"/ciclos/{ciclo.id}/envios", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["clave_union"] == "HIS-1"
+    assert data[0]["en_proceso"] is False
+
+    db.query(Envio).filter(Envio.ciclo_id == ciclo.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == ciclo.id).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_envios_de_ciclo_inexistente_404(client, auth_headers):
+    import uuid
+    r = client.get(f"/ciclos/{uuid.uuid4()}/envios", headers=auth_headers)
+    assert r.status_code == 404

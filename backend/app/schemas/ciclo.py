@@ -1,5 +1,8 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -26,3 +29,12 @@ class PreviewResponse(BaseModel):
     a_saldar: int
     duplicados: int
     total_ciclo_anterior: int
+
+
+class CicloResumenSchema(BaseModel):
+    id: UUID
+    numero: int
+    activo: bool
+    creado_en: datetime
+    total_envios: int
+    deuda_total: Decimal

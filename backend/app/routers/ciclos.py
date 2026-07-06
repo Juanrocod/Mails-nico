@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,7 +14,7 @@ from app.core.dependencies import get_current_user
 from app.models.ciclo import Ciclo
 from app.models.envio import Envio, EstadoEnvio, MotivoFiltrado
 from app.models.user import User
-from app.schemas.ciclo import PreviewItem, PreviewResponse
+from app.schemas.ciclo import PreviewItem, PreviewResponse, CicloResumenSchema
 from app.schemas.envio import EnvioSchema, EstadoUpdateRequest
 from app.services import db_config
 from app.services.ciclo_service import marcar_saldados
@@ -226,6 +227,17 @@ def desde_api(current_user: User = Depends(get_current_user)):
     raise HTTPException(status_code=501, detail="No implementado — Fase 3")
 
 
+def _envios_con_flags(ciclo: Ciclo) -> list[EnvioSchema]:
+    """Serializa los envios de un ciclo marcando cuales estan en envio en curso."""
+    en_proceso = ids_en_proceso()
+    result = []
+    for envio in ciclo.envios:
+        schema = EnvioSchema.model_validate(envio)
+        schema.en_proceso = envio.id in en_proceso
+        result.append(schema)
+    return result
+
+
 @router.get("/ciclos/activo/envios", response_model=list[EnvioSchema])
 def get_envios_activo(
     db: Session = Depends(get_db),
@@ -234,13 +246,40 @@ def get_envios_activo(
     ciclo = db.query(Ciclo).filter(Ciclo.activo == True).first()
     if not ciclo:
         return []
-    en_proceso = ids_en_proceso()
-    result = []
-    for envio in ciclo.envios:
-        schema = EnvioSchema.model_validate(envio)
-        schema.en_proceso = envio.id in en_proceso
-        result.append(schema)
-    return result
+    return _envios_con_flags(ciclo)
+
+
+@router.get("/ciclos", response_model=list[CicloResumenSchema])
+def listar_ciclos(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    aggs = {
+        ciclo_id: (total, deuda)
+        for ciclo_id, total, deuda in db.query(
+            Envio.ciclo_id, func.count(Envio.id), func.coalesce(func.sum(Envio.monto), 0)
+        ).group_by(Envio.ciclo_id)
+    }
+    ciclos = db.query(Ciclo).order_by(Ciclo.numero.desc()).all()
+    return [
+        CicloResumenSchema(
+            id=c.id, numero=c.numero, activo=c.activo, creado_en=c.creado_en,
+            total_envios=aggs.get(c.id, (0, 0))[0], deuda_total=aggs.get(c.id, (0, 0))[1],
+        )
+        for c in ciclos
+    ]
+
+
+@router.get("/ciclos/{ciclo_id}/envios", response_model=list[EnvioSchema])
+def get_envios_de_ciclo(
+    ciclo_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ciclo = db.get(Ciclo, ciclo_id)
+    if ciclo is None:
+        raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+    return _envios_con_flags(ciclo)
 
 
 @router.patch("/envios/{envio_id}/estado", response_model=EnvioSchema)
