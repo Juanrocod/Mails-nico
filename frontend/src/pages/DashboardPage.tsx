@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Skeleton } from "../components/ui/skeleton";
 import { EvolucionChart } from "../components/dashboard/EvolucionChart";
-import { getDashboardResumen, getDashboardEvolucion } from "../services/dashboard";
+import { getDashboardResumen, getDashboardEvolucion, getMorosos } from "../services/dashboard";
 import { getEnviosActivo } from "../services/ciclos";
-import type { DashboardResumen, EvolucionCiclo, Envio } from "../types/domain";
+import type { DashboardResumen, EvolucionCiclo, Envio, Moroso } from "../types/domain";
 
 function pesos(n: number | null): string {
   if (n === null) return "—";
@@ -49,16 +49,18 @@ export default function DashboardPage() {
   const [resumen, setResumen] = useState<DashboardResumen | null>(null);
   const [evolucion, setEvolucion] = useState<EvolucionCiclo[]>([]);
   const [envios, setEnvios] = useState<Envio[]>([]);
+  const [morosos, setMorosos] = useState<Moroso[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    Promise.all([getDashboardResumen(), getDashboardEvolucion(), getEnviosActivo()])
-      .then(([r, e, envs]) => {
+    Promise.all([getDashboardResumen(), getDashboardEvolucion(), getEnviosActivo(), getMorosos()])
+      .then(([r, e, envs, mor]) => {
         setResumen(r);
         setEvolucion(e);
         setEnvios(envs);
+        setMorosos(mor);
       })
       .catch((err) => {
         console.error(err);
@@ -80,10 +82,6 @@ export default function DashboardPage() {
   }
 
   const topMonto = [...envios].sort((a, b) => Number(b.monto) - Number(a.monto)).slice(0, 10);
-  const topCronicos = [...envios]
-    .filter((e) => e.ciclo_numero > 1)
-    .sort((a, b) => b.ciclo_numero - a.ciclo_numero || Number(b.monto) - Number(a.monto))
-    .slice(0, 10);
 
   const chartData = evolucion.map((c) => ({
     label: `#${c.numero} ${format(new Date(c.fecha), "dd/MM", { locale: es })}`,
@@ -145,45 +143,71 @@ export default function DashboardPage() {
               <TabsTrigger value="monto">Top deudores por monto</TabsTrigger>
               <TabsTrigger value="cronicos">Morosos crónicos</TabsTrigger>
             </TabsList>
-            {(["monto", "cronicos"] as const).map((tab) => {
-              const list = tab === "monto" ? topMonto : topCronicos;
-              return (
-                <TabsContent key={tab} value={tab}>
-                  {list.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      {tab === "cronicos"
-                        ? "Nadie lleva más de un ciclo debiendo."
-                        : "No hay deudores en el ciclo activo."}
-                    </p>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left">
-                          <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Consorcio</th>
-                          <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Monto</th>
-                          <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Ciclos debiendo</th>
-                          <th className="py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Último mail</th>
+            <TabsContent value="monto">
+              {topMonto.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No hay deudores en el ciclo activo.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Consorcio</th>
+                      <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Monto</th>
+                      <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Ciclos debiendo</th>
+                      <th className="py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Último mail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topMonto.map((e) => (
+                      <tr key={e.id}
+                        className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
+                        onClick={() => navigate(`/clientes/${encodeURIComponent(e.clave_union)}`)}>
+                        <td className="py-2.5 pr-4 text-foreground">{e.nombre_consorcio}</td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums">{pesos(Number(e.monto))}</td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums">{e.ciclo_numero}</td>
+                        <td className="py-2.5 text-muted-foreground">{ESTADO_MAIL[e.estado] ?? e.estado}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </TabsContent>
+            <TabsContent value="cronicos">
+              {morosos.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No hay deudores con deuda vigente.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Consorcio</th>
+                      <th className="py-2 pr-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Debe hace</th>
+                      <th className="py-2 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Monto</th>
+                      <th className="py-2 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Recordatorios</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {morosos.map((m) => {
+                      const dias = differenceInDays(new Date(), new Date(m.deudor_desde));
+                      return (
+                        <tr key={m.clave_union}
+                          className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
+                          onClick={() => navigate(`/clientes/${encodeURIComponent(m.clave_union)}`)}>
+                          <td className="py-2.5 pr-4 text-foreground">{m.nombre_consorcio}</td>
+                          <td className={`py-2.5 pr-4 ${dias > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                            {formatDistanceToNow(new Date(m.deudor_desde), { locale: es })}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right tabular-nums">{pesos(Number(m.monto))}</td>
+                          <td className="py-2.5 text-right tabular-nums text-muted-foreground">{m.ciclos_debiendo}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((e) => (
-                          <tr
-                            key={e.id}
-                            className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
-                            onClick={() => navigate(`/clientes/${encodeURIComponent(e.clave_union)}`)}
-                          >
-                            <td className="py-2.5 pr-4 text-foreground">{e.nombre_consorcio}</td>
-                            <td className="py-2.5 pr-4 text-right tabular-nums">{pesos(Number(e.monto))}</td>
-                            <td className="py-2.5 pr-4 text-right tabular-nums">{e.ciclo_numero}</td>
-                            <td className="py-2.5 text-muted-foreground">{ESTADO_MAIL[e.estado] ?? e.estado}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </TabsContent>
-              );
-            })}
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </TabsContent>
           </Tabs>
         </>
       )}
