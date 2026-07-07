@@ -14,15 +14,29 @@ function pesos(n: number | null): string {
   return `$${Number(n).toLocaleString("es-AR")}`;
 }
 
-function VariacionDeuda({ actual, anterior }: { actual: number; anterior: number | null }) {
-  if (anterior === null || Number(anterior) === 0) return null;
-  const pct = ((actual - anterior) / anterior) * 100;
-  const bajo = pct < 0;
-  const signo = pct > 0 ? "+" : "";
+function VariacionCard({ actual, anterior }: { actual: number; anterior: number | null }) {
+  if (anterior === null || Number(anterior) === 0) {
+    return (
+      <div className="rounded-md border border-border bg-secondary/30 p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Variación vs. ciclo anterior</p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">—</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Sin ciclo anterior para comparar</p>
+      </div>
+    );
+  }
+  const diff = actual - anterior; // negativo = achicaste deuda (bueno)
+  const bajo = diff < 0;
+  const pctAbs = Math.abs((diff / anterior) * 100);
   return (
-    <span className={bajo ? "text-success-text" : "text-destructive"}>
-      {signo}{pct.toFixed(1)}% vs. ciclo anterior
-    </span>
+    <div className="rounded-md border border-border bg-secondary/30 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Variación vs. ciclo anterior</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${bajo ? "text-success-text" : "text-destructive-text"}`}>
+        {bajo ? "-" : "+"}${Math.abs(diff).toLocaleString("es-AR")}
+      </p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {pctAbs.toFixed(1)}% {bajo ? "menos" : "más"} que el ciclo anterior
+      </p>
+    </div>
   );
 }
 
@@ -105,11 +119,7 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard
-              titulo="Deuda actual"
-              valor={pesos(resumen.deuda_total)}
-              detalle={<VariacionDeuda actual={resumen.deuda_total} anterior={resumen.deuda_total_anterior} />}
-            />
+            <KpiCard titulo="Deuda actual" valor={pesos(resumen.deuda_total)} />
             <KpiCard
               titulo="Deudores"
               valor={String(resumen.deudores)}
@@ -119,11 +129,7 @@ export default function DashboardPage() {
                   : undefined
               }
             />
-            <KpiCard
-              titulo="Cobrado desde el ciclo anterior"
-              valor={pesos(resumen.cobrado)}
-              detalle="Deuda saldada + pagos parciales"
-            />
+            <VariacionCard actual={resumen.deuda_total} anterior={resumen.deuda_total_anterior} />
             <KpiCard
               titulo="Deuda +90 días"
               valor={pesos(resumen.deuda_mas_90)}
