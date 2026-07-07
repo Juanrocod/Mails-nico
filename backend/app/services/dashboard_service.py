@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.ciclo import Ciclo
-from app.models.envio import Envio
+from app.models.envio import Envio, EstadoEnvio
 
 
 @dataclass
@@ -119,3 +119,43 @@ def evolucion(db: Session) -> list[EvolucionItem]:
         ))
         envios_previos = envios
     return items
+
+
+_UMBRAL_VENCIDA_DIAS = 90
+
+
+def _a_naive_utc(dt: datetime) -> datetime:
+    """Normaliza a naive-UTC. Ciclo.creado_en vuelve naive desde Postgres pero
+    puede ser aware en la sesion de test; asi las comparaciones nunca mezclan."""
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def deudor_desde_por_clave(db: Session, claves: set[str]) -> dict[str, datetime]:
+    """Para cada clave con deuda vigente, la fecha del primer ciclo de su racha
+    actual ('deudor desde'). Claves sin deuda vigente (envio mas reciente PAGO o
+    saldado) no aparecen. Una sola query cross-ciclo."""
+    if not claves:
+        return {}
+    rows = (
+        db.query(Envio.clave_union, Ciclo.creado_en, Envio.estado, Envio.saldado_en)
+        .join(Ciclo, Envio.ciclo_id == Ciclo.id)
+        .filter(Envio.clave_union.in_(claves))
+        .order_by(Ciclo.numero.desc())
+        .all()
+    )
+    por_clave: dict[str, list] = {}
+    for clave, creado_en, estado, saldado_en in rows:
+        por_clave.setdefault(clave, []).append((creado_en, estado, saldado_en))
+
+    resultado: dict[str, datetime] = {}
+    for clave, envios in por_clave.items():
+        streak_start = None
+        for creado_en, estado, saldado_en in envios:  # mas reciente primero
+            if estado == EstadoEnvio.PAGO or saldado_en is not None:
+                break  # cierra una racha anterior; no es parte de la vigente
+            streak_start = creado_en
+        if streak_start is not None:
+            resultado[clave] = streak_start
+    return resultado
