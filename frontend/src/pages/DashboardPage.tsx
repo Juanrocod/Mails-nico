@@ -16,14 +16,19 @@ function pesos(n: number | null): string {
   return `$${Number(n).toLocaleString("es-AR")}`;
 }
 
-function variacion(actual: number, anterior: number | null): string {
-  if (anterior === null || Number(anterior) === 0) return "";
+function VariacionDeuda({ actual, anterior }: { actual: number; anterior: number | null }) {
+  if (anterior === null || Number(anterior) === 0) return null;
   const pct = ((actual - anterior) / anterior) * 100;
+  const bajo = pct < 0;
   const signo = pct > 0 ? "+" : "";
-  return `${signo}${pct.toFixed(1)}% vs. ciclo anterior`;
+  return (
+    <span className={bajo ? "text-success-foreground" : "text-destructive"}>
+      {signo}{pct.toFixed(1)}% vs. ciclo anterior
+    </span>
+  );
 }
 
-function KpiCard({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: string }) {
+function KpiCard({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: React.ReactNode }) {
   return (
     <div className="rounded-md border border-border bg-secondary/30 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{titulo}</p>
@@ -107,9 +112,9 @@ export default function DashboardPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard
-              titulo="Deuda total"
+              titulo="Deuda actual"
               valor={pesos(resumen.deuda_total)}
-              detalle={variacion(resumen.deuda_total, resumen.deuda_total_anterior)}
+              detalle={<VariacionDeuda actual={resumen.deuda_total} anterior={resumen.deuda_total_anterior} />}
             />
             <KpiCard
               titulo="Deudores"
@@ -126,9 +131,9 @@ export default function DashboardPage() {
               detalle="Deuda saldada + pagos parciales"
             />
             <KpiCard
-              titulo="Deuda con más de 90 días"
+              titulo="Deuda +90 días"
               valor={pesos(resumen.deuda_mas_90)}
-              detalle="Sin resolver desde ciclos anteriores"
+              detalle="Deuda de más de 90 días — en riesgo"
             />
           </div>
 
