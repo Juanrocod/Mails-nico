@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
-} from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Skeleton } from "../components/ui/skeleton";
+import { EvolucionChart } from "../components/dashboard/EvolucionChart";
 import { getDashboardResumen, getDashboardEvolucion } from "../services/dashboard";
 import { getEnviosActivo } from "../services/ciclos";
 import type { DashboardResumen, EvolucionCiclo, Envio } from "../types/domain";
@@ -88,10 +86,8 @@ export default function DashboardPage() {
     .slice(0, 10);
 
   const chartData = evolucion.map((c) => ({
-    nombre: `#${c.numero} ${format(new Date(c.fecha), "dd/MM", { locale: es })}`,
-    deuda: Number(c.deuda_total),
-    cobrado: c.cobrado === null ? 0 : Number(c.cobrado),
-    deudores: c.deudores,
+    label: `#${c.numero} ${format(new Date(c.fecha), "dd/MM", { locale: es })}`,
+    valor: Number(c.deuda_total),
   }));
 
   return (
@@ -139,20 +135,8 @@ export default function DashboardPage() {
 
           {chartData.length > 1 && (
             <div className="rounded-md border border-border p-4">
-              <p className="mb-3 text-sm font-medium text-foreground">Evolución por ciclo</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="nombre" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value: unknown, name: unknown) =>
-                    name === "Deudores" ? (value as number) : `$${Number(value).toLocaleString("es-AR")}`
-                  } />
-                  <Legend />
-                  <Bar dataKey="cobrado" name="Cobrado" fill="hsl(var(--primary))" opacity={0.5} />
-                  <Line type="monotone" dataKey="deuda" name="Deuda total" stroke="hsl(var(--primary))" strokeWidth={2} dot />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <p className="mb-3 text-sm font-medium text-foreground">Evolución de la deuda</p>
+              <EvolucionChart data={chartData} />
             </div>
           )}
 
