@@ -6,7 +6,8 @@ import { es } from "date-fns/locale";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { getHistorialCliente } from "../services/maestro";
-import type { HistorialCliente } from "../types/domain";
+import { getCiclos } from "../services/ciclos";
+import type { HistorialCliente, CicloResumen } from "../types/domain";
 import { EvolucionChart } from "../components/dashboard/EvolucionChart";
 import { categoriaRiesgo } from "../lib/estado";
 
@@ -27,13 +28,17 @@ export default function ClientePerfilPage() {
   const { clave } = useParams<{ clave: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<HistorialCliente | null>(null);
+  const [ciclos, setCiclos] = useState<CicloResumen[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!clave) return;
-    getHistorialCliente(clave)
-      .then(setData)
+    Promise.all([getHistorialCliente(clave), getCiclos()])
+      .then(([d, cs]) => {
+        setData(d);
+        setCiclos(cs);
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Error cargando el perfil"))
       .finally(() => setLoading(false));
   }, [clave]);
@@ -62,9 +67,18 @@ export default function ClientePerfilPage() {
   const items = data.items;
   const desde = data.deudor_desde ? new Date(data.deudor_desde) : null;
   const diasDebiendo = desde ? differenceInDays(new Date(), desde) : null;
-  const serieDeuda = [...items]
-    .reverse()
-    .map((i) => ({ label: `#${i.ciclo}`, valor: Number(i.monto) }));
+  // Deuda historica real: desde el primer ciclo en que aparecio hasta hoy, con
+  // su deuda en cada ciclo y $0 en los periodos que estuvo al dia (para que se
+  // vean los altibajos reales, no una linea continua ficticia).
+  const montoPorCiclo = new Map(items.map((i) => [i.ciclo, Number(i.monto)]));
+  const primerCiclo = items.length ? Math.min(...items.map((i) => i.ciclo)) : 0;
+  const serieDeuda = [...ciclos]
+    .filter((c) => c.numero >= primerCiclo)
+    .sort((a, b) => a.numero - b.numero)
+    .map((c) => {
+      const m = format(new Date(c.creado_en), "MMM yy", { locale: es });
+      return { label: m.charAt(0).toUpperCase() + m.slice(1), valor: montoPorCiclo.get(c.numero) ?? 0 };
+    });
   const actual = items.find((i) => i.ciclo_activo);
   // Racha vigente: desde el mas reciente hacia atras hasta un ciclo saldado/pagado.
   // Mismo criterio que deudor_desde del backend, para contar mails de ESTA deuda.
