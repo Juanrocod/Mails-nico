@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { getHistorialCliente } from "../services/maestro";
 import type { HistorialCliente } from "../types/domain";
+import { EvolucionChart } from "../components/dashboard/EvolucionChart";
 
 const ESTADO_LABEL: Record<string, string> = {
   NO_CONTESTADO: "Sin respuesta",
@@ -58,6 +59,11 @@ export default function ClientePerfilPage() {
   }
 
   const items = data.items;
+  const desde = data.deudor_desde ? new Date(data.deudor_desde) : null;
+  const diasDebiendo = desde ? differenceInDays(new Date(), desde) : null;
+  const serieDeuda = [...items]
+    .reverse()
+    .map((i) => ({ label: `#${i.ciclo}`, valor: Number(i.monto) }));
   const actual = items.find((i) => i.ciclo_activo);
   const totalSaldado = items.filter((i) => i.saldado_en).reduce((acc, i) => acc + Number(i.monto), 0);
   const conMail = items.filter((i) => i.recibio_mail);
@@ -85,6 +91,14 @@ export default function ClientePerfilPage() {
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
           {data.cliente?.email ?? "Sin email"} · {data.cliente?.localidad ?? "Sin localidad"} · {estadoCliente}
+          {desde && (
+            <>
+              {" · "}
+              <span className={diasDebiendo !== null && diasDebiendo > 90 ? "font-medium text-destructive" : ""}>
+                Deudor desde {format(desde, "dd/MM/yyyy", { locale: es })} (hace {formatDistanceToNow(desde, { locale: es })})
+              </span>
+            </>
+          )}
         </p>
       </div>
 
@@ -94,8 +108,11 @@ export default function ClientePerfilPage() {
           <p className="mt-1 text-2xl font-semibold tabular-nums">{actual ? pesos(Number(actual.monto)) : "—"}</p>
         </div>
         <div className="rounded-md border border-border bg-secondary/30 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ciclos debiendo</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{actual ? actual.racha : "—"}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Debe hace</p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${diasDebiendo !== null && diasDebiendo > 90 ? "text-destructive" : ""}`}>
+            {desde ? formatDistanceToNow(desde, { locale: es }) : "—"}
+          </p>
+          {actual && <p className="mt-0.5 text-xs text-muted-foreground">{actual.racha} recordatorios enviados</p>}
         </div>
         <div className="rounded-md border border-border bg-secondary/30 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Saldado histórico</p>
@@ -108,6 +125,13 @@ export default function ClientePerfilPage() {
           </p>
         </div>
       </div>
+
+      {serieDeuda.length > 1 && (
+        <div className="rounded-md border border-border p-4">
+          <p className="mb-3 text-sm font-medium text-foreground">Evolución de su deuda</p>
+          <EvolucionChart data={serieDeuda} />
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
