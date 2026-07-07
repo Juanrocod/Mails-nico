@@ -284,3 +284,59 @@ def test_historial_de_clave_sin_maestro(client, auth_headers, db):
 def test_historial_clave_inexistente_404(client, auth_headers):
     r = client.get("/maestro/NO-EXISTE-999/historial", headers=auth_headers)
     assert r.status_code == 404
+
+
+def test_historial_incluye_deudor_desde(client, auth_headers, db):
+    from datetime import datetime, timedelta, timezone
+    from decimal import Decimal
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    db.add(ClienteMaestro(clave_union="DSD-1", nombre="Deudor Desde",
+                          email="dsd1@mail.com", actualizado_en=datetime.now(timezone.utc)))
+    c1 = Ciclo(numero=8941, activo=False, creado_en=datetime.now(timezone.utc) - timedelta(days=50))
+    c2 = Ciclo(numero=8942, activo=True, creado_en=datetime.now(timezone.utc))
+    db.add_all([c1, c2])
+    db.flush()
+    for ciclo, racha in ((c1, 1), (c2, 2)):
+        db.add(Envio(ciclo_id=ciclo.id, ciclo_numero=racha, clave_union="DSD-1",
+                     nombre_consorcio="Deudor Desde", email="dsd1@mail.com",
+                     monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+                     actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    r = client.get("/maestro/DSD-1/historial", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["deudor_desde"] is not None
+
+    db.query(Envio).filter(Envio.ciclo_id.in_([c1.id, c2.id])).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id.in_([c1.id, c2.id])).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "DSD-1").delete(synchronize_session=False)
+    db.commit()
+
+
+def test_historial_deudor_desde_none_si_saldado(client, auth_headers, db):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from app.models.cliente_maestro import ClienteMaestro
+    from app.models.ciclo import Ciclo
+    from app.models.envio import Envio, EstadoEnvio
+
+    db.add(ClienteMaestro(clave_union="DSD-2", nombre="Saldado",
+                          email="dsd2@mail.com", actualizado_en=datetime.now(timezone.utc)))
+    c = Ciclo(numero=8943, activo=False, creado_en=datetime.now(timezone.utc))
+    db.add(c)
+    db.flush()
+    db.add(Envio(ciclo_id=c.id, ciclo_numero=1, clave_union="DSD-2", nombre_consorcio="Saldado",
+                 email="dsd2@mail.com", monto=Decimal("1000"), estado=EstadoEnvio.NO_CONTESTADO,
+                 saldado_en=datetime.now(timezone.utc), actualizado_en=datetime.now(timezone.utc)))
+    db.commit()
+
+    r = client.get("/maestro/DSD-2/historial", headers=auth_headers)
+    assert r.json()["deudor_desde"] is None
+
+    db.query(Envio).filter(Envio.ciclo_id == c.id).delete(synchronize_session=False)
+    db.query(Ciclo).filter(Ciclo.id == c.id).delete(synchronize_session=False)
+    db.query(ClienteMaestro).filter(ClienteMaestro.clave_union == "DSD-2").delete(synchronize_session=False)
+    db.commit()

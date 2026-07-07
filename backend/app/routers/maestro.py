@@ -19,6 +19,7 @@ from app.schemas.maestro import (
 )
 from app.services.excel_parser import parse_maestro, ExcelParseError
 from app.services.maestro_service import merge_maestro, crear_cliente_manual
+from app.services import dashboard_service
 
 router = APIRouter(prefix="/maestro", tags=["maestro"])
 
@@ -90,7 +91,10 @@ def historial_cliente(
         )
         for envio, ciclo in rows
     ]
-    return HistorialClienteResponse(cliente=cliente, clave_union=clave_union, items=items)
+    deudor_desde = dashboard_service.deudor_desde_por_clave(db, {clave_union}).get(clave_union)
+    return HistorialClienteResponse(
+        cliente=cliente, clave_union=clave_union, deudor_desde=deudor_desde, items=items
+    )
 
 
 @router.put("/{cliente_id}", response_model=ClienteMaestroSchema)

@@ -65,6 +65,7 @@ class HistorialItemSchema(BaseModel):
 class HistorialClienteResponse(BaseModel):
     cliente: Optional[ClienteMaestroSchema] = None
     clave_union: str
+    deudor_desde: Optional[datetime] = None
     items: list[HistorialItemSchema]
 
 
