@@ -20,7 +20,7 @@ function VariacionDeuda({ actual, anterior }: { actual: number; anterior: number
   const bajo = pct < 0;
   const signo = pct > 0 ? "+" : "";
   return (
-    <span className={bajo ? "text-success-foreground" : "text-destructive"}>
+    <span className={bajo ? "text-success-text" : "text-destructive"}>
       {signo}{pct.toFixed(1)}% vs. ciclo anterior
     </span>
   );
