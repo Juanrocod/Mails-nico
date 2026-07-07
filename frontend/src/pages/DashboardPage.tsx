@@ -97,7 +97,7 @@ export default function DashboardPage() {
     );
   }
 
-  const topMonto = [...envios].sort((a, b) => Number(b.monto) - Number(a.monto)).slice(0, 10);
+  const deudoresPorMonto = [...envios].sort((a, b) => Number(b.monto) - Number(a.monto));
 
   const aniosDisponibles = Array.from(
     new Set(evolucion.map((c) => new Date(c.fecha).getFullYear())),
@@ -179,11 +179,11 @@ export default function DashboardPage() {
 
           <Tabs defaultValue="monto">
             <TabsList>
-              <TabsTrigger value="monto">Top deudores por monto</TabsTrigger>
+              <TabsTrigger value="monto">Deudores por monto ({deudoresPorMonto.length})</TabsTrigger>
               <TabsTrigger value="cronicos">Morosos crónicos</TabsTrigger>
             </TabsList>
             <TabsContent value="monto">
-              {topMonto.length === 0 ? (
+              {deudoresPorMonto.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   No hay deudores en el ciclo activo.
                 </p>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {topMonto.map((e) => (
+                    {deudoresPorMonto.map((e) => (
                       <tr key={e.id}
                         className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                         onClick={() => navigate(`/clientes/${encodeURIComponent(e.clave_union)}`)}>
