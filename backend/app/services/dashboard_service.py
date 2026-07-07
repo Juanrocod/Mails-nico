@@ -172,9 +172,10 @@ def deudor_desde_por_clave(db: Session, claves: set[str]) -> dict[str, datetime]
     return resultado
 
 
-def morosos(db: Session, limite: int = 10) -> list[MorosoItem]:
+def morosos(db: Session, limite: Optional[int] = None) -> list[MorosoItem]:
     """Deudores del ciclo activo con deuda vigente, ordenados por antiguedad
-    (deuda mas vieja primero). Excluye a quien figura pagado."""
+    (deuda mas vieja primero). Excluye a quien figura pagado. Sin limite por
+    defecto (limite=None -> items[:None] devuelve todos)."""
     activo = db.query(Ciclo).filter(Ciclo.activo == True).first()
     if activo is None:
         return []

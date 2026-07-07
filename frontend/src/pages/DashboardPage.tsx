@@ -180,7 +180,7 @@ export default function DashboardPage() {
           <Tabs defaultValue="monto">
             <TabsList>
               <TabsTrigger value="monto">Deudores por monto ({deudoresPorMonto.length})</TabsTrigger>
-              <TabsTrigger value="cronicos">Morosos crónicos</TabsTrigger>
+              <TabsTrigger value="cronicos">Deudores por antigüedad ({morosos.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="monto">
               {deudoresPorMonto.length === 0 ? (
