@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.models.envio import EstadoEnvio
+
 
 class DashboardResumenResponse(BaseModel):
     hay_ciclo_activo: bool
@@ -12,7 +14,7 @@ class DashboardResumenResponse(BaseModel):
     deudores: int
     deudores_anterior: Optional[int] = None
     cobrado: Optional[Decimal] = None
-    efectividad: Optional[float] = None
+    deuda_mas_90: Decimal
 
 
 class EvolucionCicloSchema(BaseModel):
@@ -21,3 +23,12 @@ class EvolucionCicloSchema(BaseModel):
     deuda_total: Decimal
     deudores: int
     cobrado: Optional[Decimal] = None
+
+
+class MorosoSchema(BaseModel):
+    clave_union: str
+    nombre_consorcio: str
+    monto: Decimal
+    deudor_desde: datetime
+    ciclos_debiendo: int
+    estado: EstadoEnvio

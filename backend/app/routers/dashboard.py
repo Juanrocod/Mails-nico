@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.dashboard import DashboardResumenResponse, EvolucionCicloSchema
+from app.schemas.dashboard import DashboardResumenResponse, EvolucionCicloSchema, MorosoSchema
 from app.services import dashboard_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -23,7 +23,7 @@ def get_resumen(
         deudores=data.deudores,
         deudores_anterior=data.deudores_anterior,
         cobrado=data.cobrado,
-        efectividad=data.efectividad,
+        deuda_mas_90=data.deuda_mas_90,
     )
 
 
@@ -38,4 +38,18 @@ def get_evolucion(
             deudores=item.deudores, cobrado=item.cobrado,
         )
         for item in dashboard_service.evolucion(db)
+    ]
+
+
+@router.get("/morosos", response_model=list[MorosoSchema])
+def get_morosos(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return [
+        MorosoSchema(
+            clave_union=m.clave_union, nombre_consorcio=m.nombre_consorcio, monto=m.monto,
+            deudor_desde=m.deudor_desde, ciclos_debiendo=m.ciclos_debiendo, estado=m.estado,
+        )
+        for m in dashboard_service.morosos(db)
     ]

@@ -24,7 +24,7 @@ class ResumenData:
     deudores: int
     deudores_anterior: Optional[int]
     cobrado: Optional[Decimal]
-    efectividad: Optional[float]
+    deuda_mas_90: Decimal
 
 
 @dataclass
@@ -34,6 +34,16 @@ class EvolucionItem:
     deuda_total: Decimal
     deudores: int
     cobrado: Optional[Decimal]
+
+
+@dataclass
+class MorosoItem:
+    clave_union: str
+    nombre_consorcio: str
+    monto: Decimal
+    deudor_desde: datetime
+    ciclos_debiendo: int
+    estado: EstadoEnvio
 
 
 def _envios_por_clave(db: Session, ciclo_id) -> dict[str, EnvioResumen]:
@@ -62,34 +72,35 @@ def _cobrado_entre(anteriores: dict[str, EnvioResumen], actuales: dict[str, Envi
     return cobrado
 
 
-def _efectividad(anteriores: dict[str, EnvioResumen]) -> Optional[float]:
-    con_mail = [e for e in anteriores.values() if e.con_mail]
-    if not con_mail:
-        return None
-    saldaron = sum(1 for e in con_mail if e.saldado)
-    return round(100 * saldaron / len(con_mail), 1)
-
-
 def resumen(db: Session) -> ResumenData:
     activo = db.query(Ciclo).filter(Ciclo.activo == True).first()
     if activo is None:
         return ResumenData(
             hay_ciclo_activo=False, deuda_total=Decimal("0"), deuda_total_anterior=None,
-            deudores=0, deudores_anterior=None, cobrado=None, efectividad=None,
+            deudores=0, deudores_anterior=None, cobrado=None, deuda_mas_90=Decimal("0"),
         )
+    envios_activo = _envios_por_clave(db, activo.id)
+    deuda_total = sum((e.monto for e in envios_activo.values()), start=Decimal("0"))
+
+    desde = deudor_desde_por_clave(db, set(envios_activo.keys()))
+    corte = _a_naive_utc(datetime.now(timezone.utc)) - timedelta(days=_UMBRAL_VENCIDA_DIAS)
+    deuda_mas_90 = sum(
+        (e.monto for clave, e in envios_activo.items()
+         if clave in desde and _a_naive_utc(desde[clave]) < corte),
+        start=Decimal("0"),
+    )
+
     anterior = (
         db.query(Ciclo)
         .filter(Ciclo.numero < activo.numero)
         .order_by(Ciclo.numero.desc())
         .first()
     )
-    envios_activo = _envios_por_clave(db, activo.id)
-    deuda_total = sum((e.monto for e in envios_activo.values()), start=Decimal("0"))
-
     if anterior is None:
         return ResumenData(
             hay_ciclo_activo=True, deuda_total=deuda_total, deuda_total_anterior=None,
-            deudores=len(envios_activo), deudores_anterior=None, cobrado=None, efectividad=None,
+            deudores=len(envios_activo), deudores_anterior=None, cobrado=None,
+            deuda_mas_90=deuda_mas_90,
         )
 
     envios_anterior = _envios_por_clave(db, anterior.id)
@@ -100,7 +111,7 @@ def resumen(db: Session) -> ResumenData:
         deudores=len(envios_activo),
         deudores_anterior=len(envios_anterior),
         cobrado=_cobrado_entre(envios_anterior, envios_activo),
-        efectividad=_efectividad(envios_anterior),
+        deuda_mas_90=deuda_mas_90,
     )
 
 
@@ -159,3 +170,28 @@ def deudor_desde_por_clave(db: Session, claves: set[str]) -> dict[str, datetime]
         if streak_start is not None:
             resultado[clave] = streak_start
     return resultado
+
+
+def morosos(db: Session, limite: int = 10) -> list[MorosoItem]:
+    """Deudores del ciclo activo con deuda vigente, ordenados por antiguedad
+    (deuda mas vieja primero). Excluye a quien figura pagado."""
+    activo = db.query(Ciclo).filter(Ciclo.activo == True).first()
+    if activo is None:
+        return []
+    envios = (
+        db.query(Envio.clave_union, Envio.nombre_consorcio, Envio.monto,
+                 Envio.ciclo_numero, Envio.estado)
+        .filter(Envio.ciclo_id == activo.id)
+        .all()
+    )
+    desde = deudor_desde_por_clave(db, {e.clave_union for e in envios})
+    items = [
+        MorosoItem(
+            clave_union=clave, nombre_consorcio=nombre, monto=monto,
+            deudor_desde=desde[clave], ciclos_debiendo=racha, estado=estado,
+        )
+        for clave, nombre, monto, racha, estado in envios
+        if clave in desde
+    ]
+    items.sort(key=lambda m: _a_naive_utc(m.deudor_desde))
+    return items[:limite]
