@@ -63,6 +63,11 @@ export default {
           foreground: "oklch(var(--warning-foreground))",
           text: "oklch(var(--warning-text))",
         },
+        orange: {
+          DEFAULT: "oklch(var(--orange))",
+          foreground: "oklch(var(--orange-foreground))",
+          text: "oklch(var(--orange-text))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

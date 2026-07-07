@@ -40,6 +40,9 @@ html {
     --warning: 0.70 0.16 75;
     --warning-foreground: 0.995 0 0;
     --warning-text: 0.40 0.13 75;
+    --orange: 0.68 0.16 55;
+    --orange-foreground: 0.995 0 0;
+    --orange-text: 0.48 0.16 55;
   }
 
   .dark {
@@ -72,6 +75,9 @@ html {
     --warning: 0.72 0.14 75;
     --warning-foreground: 0.18 0.03 75;
     --warning-text: 0.80 0.13 75;
+    --orange: 0.70 0.15 55;
+    --orange-foreground: 0.18 0.03 55;
+    --orange-text: 0.80 0.13 55;
   }
 }
 

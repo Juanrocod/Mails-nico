@@ -1,4 +1,20 @@
+import { differenceInDays } from "date-fns";
 import type { MotivoFiltrado, EstadoEnvio } from "../types/domain";
+
+export interface CategoriaRiesgo {
+  label: string;
+  badge: string;
+}
+
+// Semaforo de cobranza segun antiguedad de la deuda vigente (deudor_desde).
+// Al dia (no debe) / Atraso leve (<=30d) / Moroso (31-90d) / Moroso cronico (>90d).
+export function categoriaRiesgo(deudorDesde: string | null): CategoriaRiesgo {
+  if (!deudorDesde) return { label: "Al día", badge: "bg-success/15 text-success-text" };
+  const dias = differenceInDays(new Date(), new Date(deudorDesde));
+  if (dias <= 30) return { label: "Atraso leve", badge: "bg-warning/15 text-warning-text" };
+  if (dias <= 90) return { label: "Moroso", badge: "bg-orange/15 text-orange-text" };
+  return { label: "Moroso crónico", badge: "bg-destructive/15 text-destructive-text" };
+}
 
 export const MOTIVO_LABEL: Record<MotivoFiltrado, string> = {
   MONTO_MINIMO: "Monto mínimo",

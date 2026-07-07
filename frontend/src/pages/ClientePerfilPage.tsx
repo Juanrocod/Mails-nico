@@ -8,6 +8,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { getHistorialCliente } from "../services/maestro";
 import type { HistorialCliente } from "../types/domain";
 import { EvolucionChart } from "../components/dashboard/EvolucionChart";
+import { categoriaRiesgo } from "../lib/estado";
 
 const ESTADO_LABEL: Record<string, string> = {
   NO_CONTESTADO: "Sin respuesta",
@@ -83,11 +84,14 @@ export default function ClientePerfilPage() {
       </Button>
 
       <div>
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-foreground">
             {data.cliente?.nombre ?? `Clave ${data.clave_union}`}
           </h1>
           <span className="font-mono text-xs text-muted-foreground">{data.clave_union}</span>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${categoriaRiesgo(data.deudor_desde).badge}`}>
+            {categoriaRiesgo(data.deudor_desde).label}
+          </span>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
           {data.cliente?.email ?? "Sin email"} · {data.cliente?.localidad ?? "Sin localidad"} · {estadoCliente}

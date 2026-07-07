@@ -8,6 +8,7 @@ import { EvolucionChart } from "../components/dashboard/EvolucionChart";
 import { getDashboardResumen, getDashboardEvolucion, getMorosos } from "../services/dashboard";
 import { getEnviosActivo } from "../services/ciclos";
 import type { DashboardResumen, EvolucionCiclo, Envio, Moroso } from "../types/domain";
+import { categoriaRiesgo } from "../lib/estado";
 
 function pesos(n: number | null): string {
   if (n === null) return "—";
@@ -197,11 +198,17 @@ export default function DashboardPage() {
                   <tbody>
                     {morosos.map((m) => {
                       const dias = differenceInDays(new Date(), new Date(m.deudor_desde));
+                      const cat = categoriaRiesgo(m.deudor_desde);
                       return (
                         <tr key={m.clave_union}
                           className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                           onClick={() => navigate(`/clientes/${encodeURIComponent(m.clave_union)}`)}>
-                          <td className="py-2.5 pr-4 text-foreground">{m.nombre_consorcio}</td>
+                          <td className="py-2.5 pr-4 text-foreground">
+                            <span className="inline-flex items-center gap-2">
+                              {m.nombre_consorcio}
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${cat.badge}`}>{cat.label}</span>
+                            </span>
+                          </td>
                           <td className={`py-2.5 pr-4 ${dias > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
                             {formatDistanceToNow(new Date(m.deudor_desde), { locale: es })}
                           </td>
