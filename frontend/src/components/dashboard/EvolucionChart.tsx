@@ -3,6 +3,12 @@ import {
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
 
+function formatEje(v: number): string {
+  if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `$${Math.round(v / 1000)}k`;
+  return `$${v}`;
+}
+
 function ChartTooltip({ active, payload, label }: TooltipContentProps) {
   if (!active || !payload || payload.length === 0) return null;
   const valor = payload[0].value ?? 0;
@@ -37,8 +43,8 @@ export function EvolucionChart({ data }: { data: { label: string; valor: number 
           tick={{ fill: "oklch(var(--muted-foreground))", fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          width={48}
-          tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+          width={52}
+          tickFormatter={formatEje}
         />
         <Tooltip content={(props) => <ChartTooltip {...props} />} cursor={{ stroke: "oklch(var(--border))" }} />
         <Area

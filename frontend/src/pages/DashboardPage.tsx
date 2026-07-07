@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [morosos, setMorosos] = useState<Moroso[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [anio, setAnio] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -98,10 +99,26 @@ export default function DashboardPage() {
 
   const topMonto = [...envios].sort((a, b) => Number(b.monto) - Number(a.monto)).slice(0, 10);
 
-  const chartData = evolucion.map((c) => ({
-    label: `#${c.numero} ${format(new Date(c.fecha), "dd/MM", { locale: es })}`,
-    valor: Number(c.deuda_total),
-  }));
+  const aniosDisponibles = Array.from(
+    new Set(evolucion.map((c) => new Date(c.fecha).getFullYear())),
+  ).sort((a, b) => b - a);
+  const anioActivo = anio ?? aniosDisponibles[0] ?? new Date().getFullYear();
+
+  // Serie mensual del año elegido: deuda del último ciclo de cada mes (foto de fin de mes).
+  const ultimoPorMes = new Map<number, EvolucionCiclo>();
+  for (const c of evolucion) {
+    const f = new Date(c.fecha);
+    if (f.getFullYear() !== anioActivo) continue;
+    const mes = f.getMonth();
+    const prev = ultimoPorMes.get(mes);
+    if (!prev || f > new Date(prev.fecha)) ultimoPorMes.set(mes, c);
+  }
+  const chartData = Array.from(ultimoPorMes.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([mes, c]) => {
+      const m = format(new Date(anioActivo, mes, 1), "MMM", { locale: es });
+      return { label: m.charAt(0).toUpperCase() + m.slice(1), valor: Number(c.deuda_total) };
+    });
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -138,10 +155,25 @@ export default function DashboardPage() {
             />
           </div>
 
-          {chartData.length > 1 && (
+          {aniosDisponibles.length > 0 && (
             <div className="rounded-md border border-border p-4">
-              <p className="mb-3 text-sm font-medium text-foreground">Evolución de la deuda</p>
-              <EvolucionChart data={chartData} />
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-foreground">Evolución de la deuda</p>
+                <select
+                  value={anioActivo}
+                  onChange={(e) => setAnio(Number(e.target.value))}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {aniosDisponibles.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              {chartData.length > 0 ? (
+                <EvolucionChart data={chartData} />
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin datos para {anioActivo}.</p>
+              )}
             </div>
           )}
 
