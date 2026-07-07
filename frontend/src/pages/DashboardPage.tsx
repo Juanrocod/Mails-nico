@@ -126,9 +126,9 @@ export default function DashboardPage() {
               detalle="Deuda saldada + pagos parciales"
             />
             <KpiCard
-              titulo="Saldaron tras el recordatorio"
-              valor={resumen.efectividad === null ? "—" : `${resumen.efectividad}%`}
-              detalle="De los que recibieron mail el ciclo pasado"
+              titulo="Deuda con más de 90 días"
+              valor={pesos(resumen.deuda_mas_90)}
+              detalle="Sin resolver desde ciclos anteriores"
             />
           </div>
 

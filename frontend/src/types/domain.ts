@@ -101,7 +101,7 @@ export interface DashboardResumen {
   deudores: number;
   deudores_anterior: number | null;
   cobrado: number | null;
-  efectividad: number | null;
+  deuda_mas_90: number;
 }
 
 export interface EvolucionCiclo {
@@ -138,10 +138,20 @@ export interface HistorialItem {
 export interface HistorialCliente {
   cliente: ClienteMaestro | null;
   clave_union: string;
+  deudor_desde: string | null;
   items: HistorialItem[];
 }
 
 export interface RespuestasTardias {
   count: number;
   ciclos: { ciclo_id: string; numero: number; count: number }[];
+}
+
+export interface Moroso {
+  clave_union: string;
+  nombre_consorcio: string;
+  monto: number;
+  deudor_desde: string;
+  ciclos_debiendo: number;
+  estado: EstadoEnvio;
 }
