@@ -66,6 +66,15 @@ export default function ClientePerfilPage() {
     .reverse()
     .map((i) => ({ label: `#${i.ciclo}`, valor: Number(i.monto) }));
   const actual = items.find((i) => i.ciclo_activo);
+  // Racha vigente: desde el mas reciente hacia atras hasta un ciclo saldado/pagado.
+  // Mismo criterio que deudor_desde del backend, para contar mails de ESTA deuda.
+  const rachaItems: typeof items = [];
+  for (const it of items) {
+    if (it.saldado_en || it.estado === "PAGO") break;
+    rachaItems.push(it);
+  }
+  const recordatoriosDeuda = rachaItems.filter((i) => i.recibio_mail).length;
+  const respuestasDeuda = rachaItems.filter((i) => i.reply_en).length;
   const totalSaldado = items.filter((i) => i.saldado_en).reduce((acc, i) => acc + Number(i.monto), 0);
   const conMail = items.filter((i) => i.recibio_mail);
   const contesto = conMail.filter((i) => i.reply_en).length;
@@ -116,7 +125,11 @@ export default function ClientePerfilPage() {
           <p className={`mt-1 text-2xl font-semibold tabular-nums ${diasDebiendo !== null && diasDebiendo > 90 ? "text-destructive" : ""}`}>
             {desde ? formatDistanceToNow(desde, { locale: es }) : "—"}
           </p>
-          {actual && <p className="mt-0.5 text-xs text-muted-foreground">{actual.racha} recordatorios enviados</p>}
+          {desde && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {recordatoriosDeuda} recordatorio{recordatoriosDeuda === 1 ? "" : "s"} sobre esta deuda · {respuestasDeuda} respuesta{respuestasDeuda === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <div className="rounded-md border border-border bg-secondary/30 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Saldado histórico</p>
@@ -125,8 +138,9 @@ export default function ClientePerfilPage() {
         <div className="rounded-md border border-border bg-secondary/30 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Respuesta a mails</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">
-            {conMail.length === 0 ? "—" : `${contesto}/${conMail.length}`}
+            {conMail.length === 0 ? "—" : `${contesto} de ${conMail.length}`}
           </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">histórico del cliente</p>
         </div>
       </div>
 
