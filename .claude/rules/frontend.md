@@ -19,16 +19,18 @@ paths:
 
 ```
 src/
-├── pages/          ← LoginPage, NuevoEnvioPage, SeguimientoPage,
-│                     MaestroPage, PlantillaPage, ConfiguracionPage
+├── pages/          ← LoginPage, DashboardPage, NuevoEnvioPage, SeguimientoPage,
+│                     MaestroPage, PlantillaPage, ConfiguracionPage, ClientePerfilPage
 ├── components/
-│   ├── layout/     ← AppLayout.tsx, Sidebar.tsx, AuthGuard.tsx, ErrorBoundary.tsx
-│   ├── envios/     ← EnvioCard.tsx, EnvioDrawer.tsx
-│   ├── upload/     ← ExcelUploadModal.tsx, ProgresoEnvio.tsx
-│   ├── profile/    ← ChangePasswordModal.tsx
+│   ├── layout/     ← AppLayout, Sidebar, AuthGuard, ErrorBoundary
+│   ├── envios/     ← EnvioCard, EnvioDrawer
+│   ├── upload/     ← ExcelUploadModal, ProgresoEnvio, FileDropzone, MaestroUploadModal
+│   ├── profile/    ← ChangePasswordModal
+│   ├── dashboard/  ← EvolucionChart
+│   ├── maestro/    ← AgregarClienteModal
 │   └── ui/         ← shadcn/ui (auto-generados, no editar a mano)
-├── services/       ← api.ts, auth.ts, ciclos.ts, maestro.ts, envios.ts, plantilla.ts
-├── hooks/          ← useAuth.ts, useCiclo.ts, useEnvios.ts
+├── services/       ← api, auth, ciclos, maestro, envios, plantilla, configuracion, dashboard, seguimiento
+├── hooks/          ← useAuth, useCiclo, useEnvios
 └── types/          ← domain.ts (única fuente de verdad de tipos)
 ```
 
@@ -61,7 +63,7 @@ interface Envio {
   id: string
   ciclo_id: string
   clave_union: string
-  nombre: string
+  nombre_consorcio: string
   localidad: string
   monto: number
   email: string | null
@@ -174,9 +176,11 @@ eventSource.onerror = () => eventSource.close()
 
 ## Autenticación
 
-- Tokens en variable de módulo en `api.ts` — NO localStorage ni sessionStorage
-- Flujo: POST `/auth/login` → guardar token (sin 2FA, respuesta directa)
-- 401 → intenta refresh → si falla → clear token + redirect `/login`
+- Tokens (`access_token` + `refresh_token`) en **`localStorage`**, leídos/escritos en `api.ts`
+- Flujo: POST `/auth/login` → guardar tokens (sin 2FA, respuesta directa)
+- `apiFetch` agrega `Authorization: Bearer`; en 401 (salvo endpoints de auth) intenta
+  `refreshAccessToken`; si falla → limpia tokens + redirect `/login`
+- ⚠️ localStorage es accesible a JS (riesgo XSS). Aceptado para el MVP; ver `rules/seguridad.md`
 
 ## Formateo de fechas
 

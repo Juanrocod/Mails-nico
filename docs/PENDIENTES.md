@@ -39,11 +39,24 @@ El 2026-07-05 se detectó que el envío nunca completaba en producción (`OSErro
 ### 2. Sin test de integración continuo del flujo "falla → se corrige Maestro → se reenvía → aparece en Enviados"
 Cada paso individual está testeado, pero no hay un único test que atraviese las cuatro etapas en una corrida.
 
-### 3. "Mail activo" en Configuración no verifica la conexión real
-El cartel verde solo confirma que hay un email + contraseña guardados, no que el login SMTP/IMAP realmente funcione con esas credenciales. Queda como mejora a futuro (agregar una verificación real de conexión, ej. botón "Probar conexión").
+### 3. ~~"Mail activo" en Configuración no verifica la conexión real~~ — RESUELTO
+Resuelto en la sesión pre-entrega: el badge pasó a "Credenciales guardadas" (no afirma lo que no verifica) y se agregó el botón **"Probar conexión"** (`POST /configuracion/probar-conexion`) que hace login SMTP+IMAP real y muestra ✓/✗ por protocolo. Validado en prod dando ✓✓.
 
 ---
 
-## Pendientes bloqueantes de datos
+## Sesión pre-entrega (2026-07-09)
 
-Todos resueltos — ver sección "Resuelto" arriba.
+- **Honestidad de UI:** verificación real de conexión (punto 3 arriba); aclaración de que
+  PAGO se infiere de un adjunto (no es confirmación de acreditación), en drawer y tab de Pagos.
+- **Robustez:** advisory lock en `imap_watcher` (1 solo worker pollea con gunicorn); `probar_conexion`
+  y el watcher toleran credenciales indescifrables (InvalidToken) sin 500.
+- **Entorno `desarrollo`:** GitHub + Vercel + Render free + branch Neon dev (no envía mail por el free).
+- **DB de prod limpiada** para la entrega (conservando usuario, plantilla y credenciales).
+- **Limpieza de repo:** eliminada carpeta `deploy/` (cruft de otro proyecto); docs/specs ejecutados
+  archivados en `docs/archive/`; CLAUDE.md y `.claude/rules/*` sincronizados con el código real.
+
+## Mejoras conocidas pendientes
+
+- Antigüedad de deuda en DB limpia arranca "desde hoy" (correcto, pero comunicar al cliente).
+- Timeout de "Probar conexión" (15s SMTP + 15s IMAP en serie): opcional bajarlo / paralelizar.
+- Test de integración e2e del flujo falla→corrige maestro→reenvía→enviados (ver punto 2).

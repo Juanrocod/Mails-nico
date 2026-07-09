@@ -14,14 +14,18 @@ paths:
 
 ```
 app/
-├── core/       ← config.py, database.py, security.py, dependencies.py, logging_config.py, limiter.py
-├── models/     ← User, ClienteMaestro, Plantilla, Ciclo, Envio
-├── schemas/    ← auth.py, ciclo.py, maestro.py, envio.py  (Pydantic request/response)
-├── routers/    ← auth.py, ciclos.py, maestro.py, plantilla.py
+├── core/       ← config, database, security, dependencies, logging_config, limiter, validators, email_providers
+├── models/     ← User, ClienteMaestro, Plantilla, Ciclo, Envio, ConfiguracionSistema
+├── schemas/    ← auth, ciclo, maestro, envio, configuracion, dashboard, seguimiento (Pydantic)
+├── routers/    ← auth, ciclos, maestro, plantilla, configuracion, dashboard, seguimiento, unsubscribe
 └── services/
     ├── auth.py
+    ├── config_service.py     ← credenciales de email (Fernet), proveedor activo, probar_conexion (login SMTP+IMAP real)
     ├── excel_parser.py       ← parsea Excel deudores y maestro; retorna dataclasses
     ├── excel_joiner.py       ← cruza deudores con ClienteMaestro; retorna PreviewData
+    ├── ciclo_service.py      ← lógica de preview/confirmar/reenvío de ciclos
+    ├── maestro_service.py    ← merge del maestro, CRUD de clientes
+    ├── dashboard_service.py  ← KPIs, morosos por antigüedad, evolución por ciclo
     ├── email_generator.py    ← genera HTML del mail con Jinja2 + premailer (CSS inline)
     ├── smtp_sender.py        ← envío con cola asyncio y rate limiting (5 mails / 30s)
     ├── imap_watcher.py       ← polling IMAP cada 10 min; background task asyncio
@@ -86,6 +90,17 @@ async def startup():
 
 - Usa `message_id` de Envios activos (últimos 30 días) para matching con `In-Reply-To`
 - Llama a `reply_classifier.classify(msg)` → actualiza `Envio.estado` en DB
+- **Advisory lock (`pg_try_advisory_lock`)**: gunicorn corre >1 worker y el startup
+  corre en cada uno. `run_forever` sólo pollea si consigue el lock, así 1 solo worker
+  es el líder (evita polling IMAP duplicado). En SQLite/dev siempre corre.
+- El refresco manual (`seguimiento` router) llama a `_poll_inbox` directo, sin el lock.
+
+## config_service — credenciales y probar_conexion
+
+- Credenciales de Yahoo/Gmail cifradas en DB con Fernet (`ENCRYPTION_KEY`). `decrypt` puede
+  tirar `InvalidToken` si la key cambió — envolver en try/except (no dejar propagar a 500).
+- `probar_conexion(db, proveedor)` hace login SMTP+IMAP real (no envía/lee); devuelve
+  `smtp_ok`/`imap_ok`/errores. Endpoint: `POST /configuracion/probar-conexion` (con auth).
 
 ## reply_classifier — lógica de clasificación
 
@@ -113,7 +128,8 @@ db_config.save_plantilla(db, data)
 
 ## Migraciones Alembic
 
-- Una única migración inicial limpia: `0001_initial.py`
+- Cadena `0001_initial` → `0006_envio_saldado_en` (config sistema, reply fields, proveedor, saldado_en)
+- El entrypoint de prod corre `alembic upgrade head` en cada deploy
 - Usar `batch_alter_table` para todas las modificaciones (compatibilidad SQLite/PostgreSQL)
 
 ```python

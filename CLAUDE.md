@@ -8,12 +8,12 @@ Guía de contexto para Claude Code. Leer antes de tocar cualquier archivo del pr
 
 ## Qué es este proyecto
 
-Sistema web para automatizar el envío de recordatorios de deuda a consorcios clientes de una empresa de mantenimiento de ascensores. El operario sube un Excel de deudores, el sistema lo cruza con un maestro de clientes, genera mails HTML personalizados y los envía automáticamente desde Yahoo Mail. Un watcher IMAP monitorea respuestas y actualiza el dashboard.
+Sistema web para automatizar el envío de recordatorios de deuda a consorcios clientes de una empresa de mantenimiento de ascensores. El operario sube un Excel de deudores, el sistema lo cruza con un maestro de clientes, genera mails HTML personalizados y los envía automáticamente desde Yahoo o Gmail (proveedor configurable). Un watcher IMAP monitorea respuestas y un dashboard de cobranza muestra deuda, antigüedad y evolución por ciclo.
 
 **Lee `CONTEXT.md` para el glosario del dominio antes de escribir cualquier código.**  
-**Lee `docs/superpowers/specs/2026-06-30-mails-nico-design.md` para el spec completo.**  
 **Lee `docs/adr/` antes de tomar decisiones arquitectónicas.**  
-**Lee `docs/PENDIENTES.md` para ver los gaps de implementación conocidos vs. el spec.**
+**Lee `docs/PENDIENTES.md` para ver los gaps de implementación conocidos.**  
+**Specs y planes ya ejecutados quedan como histórico en `docs/archive/`.**
 
 ---
 
@@ -21,14 +21,16 @@ Sistema web para automatizar el envío de recordatorios de deuda a consorcios cl
 
 | Capa | Tecnología |
 |------|-----------|
-| Backend | Python 3.12 + FastAPI |
-| Frontend | React 18 + TypeScript |
-| Base de datos | PostgreSQL (Neon en producción) |
+| Backend | Python 3.12 + FastAPI + SQLAlchemy 2.0 + Pydantic v2 |
+| Frontend | React 18 + TypeScript + Vite + shadcn/ui + TanStack Query |
+| Base de datos | SQLite en dev · PostgreSQL (Neon) en producción |
 | Auth | JWT + bcrypt (sin 2FA) |
-| Email envío | Yahoo SMTP (`smtp.mail.yahoo.com:587`) |
-| Email lectura | Yahoo IMAP (`imap.mail.yahoo.com:993`) |
+| Credenciales de email | Cifradas en DB con Fernet (`ENCRYPTION_KEY`) |
+| Email envío | Yahoo/Gmail SMTP (`:587`, STARTTLS) — proveedor configurable |
+| Email lectura | Yahoo/Gmail IMAP (`:993`, SSL) |
 | Excel | openpyxl / pandas |
 | Real-time | Server-Sent Events (SSE) |
+| Deploy | Backend en Render (Docker, gunicorn+uvicorn) · Frontend en Vercel |
 
 ---
 
@@ -36,40 +38,31 @@ Sistema web para automatizar el envío de recordatorios de deuda a consorcios cl
 
 ```
 Mails-nico/
-├── CLAUDE.md
-├── CONTEXT.md
+├── CLAUDE.md · CONTEXT.md
 ├── docs/
-│   ├── adr/                           ← decisiones arquitectónicas 0001–0007
-│   └── superpowers/specs/             ← spec de diseño aprobado
+│   ├── adr/                       ← decisiones arquitectónicas 0001–0007
+│   ├── PENDIENTES.md              ← gaps conocidos vs. lo esperado
+│   └── archive/{plans,specs}/     ← planes y specs ya ejecutados (histórico)
 ├── backend/
 │   ├── app/
-│   │   ├── core/                      ← config, database, security, dependencies, logging, limiter
-│   │   ├── models/                    ← User, ClienteMaestro, Plantilla, Ciclo, Envio
-│   │   ├── schemas/                   ← auth, ciclo, maestro, envio (Pydantic)
-│   │   ├── routers/                   ← auth, ciclos, maestro, plantilla
-│   │   └── services/
-│   │       ├── auth.py
-│   │       ├── excel_parser.py
-│   │       ├── excel_joiner.py
-│   │       ├── email_generator.py
-│   │       ├── smtp_sender.py
-│   │       ├── imap_watcher.py
-│   │       ├── reply_classifier.py
-│   │       └── db_config.py
-│   ├── tests/
-│   ├── alembic/                       ← migración inicial única (0001_initial.py)
+│   │   ├── core/                  ← config, database, security, dependencies, logging, limiter, validators, email_providers
+│   │   ├── models/                ← User, ClienteMaestro, Plantilla, Ciclo, Envio, ConfiguracionSistema
+│   │   ├── schemas/               ← auth, ciclo, maestro, envio, configuracion, dashboard, seguimiento (Pydantic)
+│   │   ├── routers/               ← auth, ciclos, maestro, plantilla, configuracion, dashboard, seguimiento, unsubscribe
+│   │   └── services/              ← auth, ciclo_service, config_service, dashboard_service, maestro_service,
+│   │                                 excel_parser, excel_joiner, email_generator, smtp_sender,
+│   │                                 imap_watcher, reply_classifier, db_config
+│   ├── scripts/                   ← seed_user, limpiar_db_produccion, dev_setup
+│   ├── tests/                     ← pytest (≈190 tests)
+│   ├── alembic/versions/          ← 0001_initial … 0006_envio_saldado_en
 │   └── requirements.txt
 └── frontend/
     └── src/
-        ├── pages/                     ← Login, NuevoEnvio, Seguimiento, Maestro, Plantilla, Configuracion
-        ├── components/layout/         ← AppLayout, Sidebar, AuthGuard, ErrorBoundary
-        ├── components/envios/         ← EnvioCard, EnvioDrawer
-        ├── components/upload/         ← ExcelUploadModal, ProgresoEnvio
-        ├── components/profile/        ← ChangePasswordModal
-        ├── components/ui/             ← shadcn/ui (no editar a mano)
-        ├── services/                  ← api, auth, ciclos, maestro, envios, plantilla
-        ├── hooks/                     ← useAuth, useCiclo, useEnvios
-        └── types/                     ← domain.ts
+        ├── pages/                 ← Login, Dashboard, NuevoEnvio, Seguimiento, Maestro, Plantilla, Configuracion, ClientePerfil
+        ├── components/            ← layout/, envios/, upload/, profile/, dashboard/, maestro/, ui/ (shadcn, no editar a mano)
+        ├── services/              ← api, auth, ciclos, maestro, envios, plantilla, configuracion, dashboard, seguimiento
+        ├── hooks/                 ← useAuth, useCiclo, useEnvios
+        └── types/                 ← domain.ts (única fuente de verdad de tipos)
 ```
 
 ---
@@ -79,15 +72,19 @@ Mails-nico/
 | Módulo | Responsabilidad |
 |--------|----------------|
 | `auth` | Login, JWT, bcrypt, log de accesos, rate limiting |
+| `config_service` | Credenciales de email (Fernet), proveedor activo, `probar_conexion` (login SMTP+IMAP real) |
 | `excel_parser` | Parsea Excel de deudores y Excel maestro |
 | `excel_joiner` | Cruza deudores con ClienteMaestro; detecta sin mail y filtrados |
 | `email_generator` | Genera HTML del mail con Jinja2 + premailer (estilos inline) |
-| `smtp_sender` | Envío con cola y rate limiting: 5 mails cada 30 segundos |
-| `imap_watcher` | Polling IMAP cada 10 min; detecta respuestas y rebotes (background task) |
+| `smtp_sender` | Envío con cola y rate limiting: 5 mails cada 30 s |
+| `imap_watcher` | Polling IMAP cada 10 min (background); advisory lock para que 1 solo worker pollee |
 | `reply_classifier` | Adjunto → PAGO, texto → CONTESTADO, mailer-daemon → REBOTADO |
+| `dashboard_service` | KPIs (deuda, deudores, +90d), morosos por antigüedad, evolución por ciclo |
 | `db_config` | CRUD de Plantilla singleton |
-| `ciclos` router | Preview (en memoria), confirmar-envio (SSE), stub Fase 3 |
-| `maestro` router | Upload Excel maestro (merge), GET clientes |
+| `ciclos` router | Preview (en memoria), confirmar-envío (SSE), reenvío |
+| `maestro` router | Upload Excel maestro (merge), CRUD clientes |
+| `seguimiento` router | Estados por ciclo, refresco IMAP manual, respuestas tardías |
+| `unsubscribe` router | `GET /unsubscribe/{token}` → setea `prefiere_no_recibir_email` |
 
 ---
 
@@ -118,15 +115,16 @@ CONTESTADO    → PAGO        (override manual del operario)
 2. **Rate limiting SMTP es innegociable** — 5 mails cada 30 segundos, sin excepciones
 3. **Merge del maestro preserva `prefiere_no_recibir_email`** — nunca se sobreescribe
 4. **`DADO_DE_BAJA` filtra en todos los ciclos futuros** — automáticamente al cruzar con maestro
-5. **Envios históricos no se borran** — base para `ciclo_numero` (Fase 2)
+5. **Envios históricos no se borran** — base para `ciclo_numero`, antigüedad de deuda y evolución
+6. **PAGO es inferido, no confirmado** — se deriva de un adjunto en la respuesta; la UI lo aclara
 
 ---
 
-## Pendientes bloqueantes
+## Estado del proyecto
 
-- [ ] Columnas exactas y clave de unión del Excel de deudores
-- [ ] Columnas exactas y clave de unión del Excel maestro
-- [ ] App password de Yahoo del cliente
+En producción, validado con volumen real. El Excel usa `nro cliente` (8 dígitos con ceros a la izquierda), `nombre`, `localidad`, `monto`. No hay pendientes bloqueantes de datos; ver `docs/PENDIENTES.md` para mejoras conocidas.
+
+**Entornos:** `master` → prod (Vercel + Render Starter + Neon). `desarrollo` → preview (Vercel + Render free + branch Neon dev). Render free bloquea SMTP, así que dev no envía/lee mail real.
 
 ---
 
@@ -135,22 +133,24 @@ CONTESTADO    → PAGO        (override manual del operario)
 ```bash
 # Backend
 cd backend
-python -m venv venv
-venv\Scripts\activate
+python -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
 alembic upgrade head
+python scripts/seed_user.py         # crea usuario operario inicial
 uvicorn app.main:app --reload
 
 # Frontend
 cd frontend
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-Variables de entorno (`backend/.env`):
+Variables de entorno (`backend/.env`, ver `.env.example`):
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5432/mails_nico
+DATABASE_URL=sqlite:///./dev.db        # o postgresql://... en prod
 SECRET_KEY=<mínimo 32 chars>
-YAHOO_EMAIL=<email del cliente>
-YAHOO_APP_PASSWORD=<app password de Yahoo>
+ENCRYPTION_KEY=<Fernet key>            # cifra credenciales de email en DB
+YAHOO_EMAIL / YAHOO_APP_PASSWORD       # fallback; el operario las carga desde Configuración
+GMAIL_EMAIL / GMAIL_APP_PASSWORD       # opcional
+ALLOWED_ORIGINS=<origins CORS, coma-separados>
+BACKEND_PUBLIC_URL=<URL pública, para el link de unsubscribe>
 ```
