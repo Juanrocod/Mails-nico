@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +24,15 @@ setup_logging()
 _logger = logging.getLogger("mails_nico")
 
 
-app = FastAPI(title="Sistema de Cobro por Mail", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Arranca el watcher IMAP en background (reemplaza el on_event("startup") deprecado)
+    asyncio.create_task(imap_watcher.run_forever())
+    _logger.info("IMAP watcher iniciado")
+    yield
+
+
+app = FastAPI(title="Sistema de Cobro por Mail", version="1.0.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -62,12 +71,6 @@ app.include_router(dashboard.router)
 
 
 # Run migrations manually before starting: alembic upgrade head
-@app.on_event("startup")
-async def startup():
-    asyncio.create_task(imap_watcher.run_forever())
-    _logger.info("IMAP watcher iniciado")
-
-
 @app.get("/health")
 def health():
     try:
