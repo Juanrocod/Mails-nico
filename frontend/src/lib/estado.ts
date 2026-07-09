@@ -6,6 +6,14 @@ export interface CategoriaRiesgo {
   badge: string;
 }
 
+// Antiguedad compacta: "12 dias" si es menos de un mes, si no "+N meses"
+// (~30 dias por mes; el "+" indica "mas de N meses").
+export function antiguedadCorta(dias: number): string {
+  if (dias < 30) return `${dias} día${dias === 1 ? "" : "s"}`;
+  const meses = Math.floor(dias / 30);
+  return `+${meses} mes${meses === 1 ? "" : "es"}`;
+}
+
 // Semaforo de cobranza segun antiguedad de la deuda vigente (deudor_desde).
 // Al dia (no debe) / Atraso leve (<=30d) / Moroso (31-90d) / Moroso cronico (>90d).
 export function categoriaRiesgo(deudorDesde: string | null): CategoriaRiesgo {

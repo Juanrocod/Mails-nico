@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, formatDistanceToNow, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Skeleton } from "../components/ui/skeleton";
@@ -8,7 +8,7 @@ import { EvolucionChart } from "../components/dashboard/EvolucionChart";
 import { getDashboardResumen, getDashboardEvolucion, getMorosos } from "../services/dashboard";
 import { getEnviosActivo } from "../services/ciclos";
 import type { DashboardResumen, EvolucionCiclo, Envio, Moroso } from "../types/domain";
-import { categoriaRiesgo } from "../lib/estado";
+import { categoriaRiesgo, antiguedadCorta } from "../lib/estado";
 
 function pesos(n: number | null): string {
   if (n === null) return "—";
@@ -242,7 +242,7 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td className={`py-2.5 pr-4 ${dias > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-                            {formatDistanceToNow(new Date(m.deudor_desde), { locale: es })}
+                            {antiguedadCorta(dias)}
                           </td>
                           <td className="py-2.5 pr-4 text-right tabular-nums">{pesos(Number(m.monto))}</td>
                           <td className="py-2.5 text-right tabular-nums text-muted-foreground">{m.ciclos_debiendo}</td>

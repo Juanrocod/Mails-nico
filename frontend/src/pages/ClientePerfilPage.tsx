@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { format, formatDistanceToNow, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
@@ -9,7 +9,7 @@ import { getHistorialCliente } from "../services/maestro";
 import { getCiclos } from "../services/ciclos";
 import type { HistorialCliente, CicloResumen } from "../types/domain";
 import { EvolucionChart } from "../components/dashboard/EvolucionChart";
-import { categoriaRiesgo } from "../lib/estado";
+import { categoriaRiesgo, antiguedadCorta } from "../lib/estado";
 
 const ESTADO_LABEL: Record<string, string> = {
   NO_CONTESTADO: "Sin respuesta",
@@ -122,7 +122,7 @@ export default function ClientePerfilPage() {
             <>
               {" · "}
               <span className={diasDebiendo !== null && diasDebiendo > 90 ? "font-medium text-destructive" : ""}>
-                Deudor desde {format(desde, "dd/MM/yyyy", { locale: es })} (hace {formatDistanceToNow(desde, { locale: es })})
+                Deudor desde {format(desde, "dd/MM/yyyy", { locale: es })} ({antiguedadCorta(diasDebiendo ?? 0)})
               </span>
             </>
           )}
@@ -137,7 +137,7 @@ export default function ClientePerfilPage() {
         <div className="rounded-md border border-border bg-secondary/30 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Debe hace</p>
           <p className={`mt-1 text-2xl font-semibold tabular-nums ${diasDebiendo !== null && diasDebiendo > 90 ? "text-destructive" : ""}`}>
-            {desde ? formatDistanceToNow(desde, { locale: es }) : "—"}
+            {diasDebiendo !== null ? antiguedadCorta(diasDebiendo) : "—"}
           </p>
           {desde && (
             <p className="mt-0.5 text-xs text-muted-foreground">
