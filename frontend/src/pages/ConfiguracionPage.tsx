@@ -220,11 +220,11 @@ export default function ConfiguracionPage() {
           <div className="space-y-4">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Cuenta de Yahoo</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {yahooConfigurado
-                  ? "Configurada — cargá una nueva clave para reemplazarla."
-                  : "Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto."}
-              </p>
+              {!yahooConfigurado && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-foreground">Email de Yahoo</label>
@@ -255,11 +255,11 @@ export default function ConfiguracionPage() {
           <div className="space-y-4">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Cuenta de Gmail</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {gmailConfigurado
-                  ? "Configurada — cargá una nueva clave para reemplazarla."
-                  : "Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto."}
-              </p>
+              {!gmailConfigurado && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-foreground">Email de Gmail</label>
