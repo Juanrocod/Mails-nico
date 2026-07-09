@@ -218,14 +218,11 @@ export default function ConfiguracionPage() {
 
         {proveedor === "yahoo" && (
           <div className="space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Cuenta de Yahoo</h2>
-              {!yahooConfigurado && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
-                </p>
-              )}
-            </div>
+            {!yahooConfigurado && (
+              <p className="text-xs text-muted-foreground">
+                Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
+              </p>
+            )}
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-foreground">Email de Yahoo</label>
               <Input
@@ -253,14 +250,11 @@ export default function ConfiguracionPage() {
 
         {proveedor === "gmail" && (
           <div className="space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Cuenta de Gmail</h2>
-              {!gmailConfigurado && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
-                </p>
-              )}
-            </div>
+            {!gmailConfigurado && (
+              <p className="text-xs text-muted-foreground">
+                Sin configurar. El sistema no puede enviar ni leer mails hasta que cargues esto.
+              </p>
+            )}
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-foreground">Email de Gmail</label>
               <Input
