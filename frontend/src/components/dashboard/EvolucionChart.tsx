@@ -48,7 +48,7 @@ export function EvolucionChart({ data }: { data: { label: string; valor: number 
         />
         <Tooltip content={(props) => <ChartTooltip {...props} />} cursor={{ stroke: "oklch(var(--border))" }} />
         <Area
-          type="monotone"
+          type="stepAfter"
           dataKey="valor"
           stroke="oklch(var(--primary))"
           strokeWidth={2}
