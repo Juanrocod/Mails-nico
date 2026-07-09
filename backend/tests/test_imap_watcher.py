@@ -46,6 +46,27 @@ def _cleanup(db, ciclo):
     db.commit()
 
 
+def test_es_lider_en_sqlite_siempre_true(db):
+    # En SQLite (dev/tests) no hay advisory locks: el watcher siempre corre.
+    assert imap_watcher._es_lider_del_watcher(db) is True
+
+
+def test_poll_como_lider_pollea_cuando_es_lider(db, monkeypatch):
+    _usar_sesion_de_test(db, monkeypatch)
+    monkeypatch.setattr(imap_watcher, "_es_lider_del_watcher", lambda _db: True)
+    with patch("app.services.imap_watcher._poll_inbox") as mock_poll:
+        imap_watcher._poll_como_lider()
+    mock_poll.assert_called_once()
+
+
+def test_poll_como_lider_saltea_cuando_no_es_lider(db, monkeypatch):
+    _usar_sesion_de_test(db, monkeypatch)
+    monkeypatch.setattr(imap_watcher, "_es_lider_del_watcher", lambda _db: False)
+    with patch("app.services.imap_watcher._poll_inbox") as mock_poll:
+        imap_watcher._poll_como_lider()
+    mock_poll.assert_not_called()
+
+
 def test_poll_inbox_sin_envios_activos_no_conecta(db, monkeypatch):
     _usar_sesion_de_test(db, monkeypatch)
     with patch("app.services.imap_watcher.imaplib.IMAP4_SSL") as mock_imap:

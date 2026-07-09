@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
 
-logger = logging.getLogger("gestion_mails")
+logger = logging.getLogger("mails_nico.requests")
 
 
 def setup_logging() -> None:

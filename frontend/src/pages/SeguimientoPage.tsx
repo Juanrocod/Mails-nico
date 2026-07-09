@@ -180,6 +180,13 @@ export default function SeguimientoPage() {
           return (
             <TabsContent key={tab} value={tab}>
               <div className="space-y-3 mt-2">
+                {tab === "pagos" && list.length > 0 && (
+                  <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    Detectados automáticamente por traer un adjunto en la respuesta (probable comprobante), más
+                    los que marcaste a mano. No es una confirmación de acreditación — revisá cada uno antes de
+                    darlo por cobrado.
+                  </p>
+                )}
                 {list.length === 0 ? (
                   <div className="text-center py-16">
                     <p className="text-sm text-muted-foreground">Sin registros.</p>

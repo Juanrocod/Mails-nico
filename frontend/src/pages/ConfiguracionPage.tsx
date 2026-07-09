@@ -10,8 +10,13 @@ import {
   getProveedorActivo,
   updateProveedorActivo,
   getEnviosPendientes,
+  probarConexion,
 } from "../services/configuracion";
-import type { ConfiguracionEnviosPendientes, ProveedorEmail } from "../types/domain";
+import type {
+  ConfiguracionEnviosPendientes,
+  ConfiguracionProbarConexion,
+  ProveedorEmail,
+} from "../types/domain";
 
 const DISMISS_KEY = "config_intrackeados_dismissed";
 
@@ -35,6 +40,9 @@ export default function ConfiguracionPage() {
 
   const [enviosPendientes, setEnviosPendientes] = useState<ConfiguracionEnviosPendientes | null>(null);
   const [intrackeadosDismissed, setIntrackeadosDismissed] = useState(false);
+
+  const [probando, setProbando] = useState(false);
+  const [resultadoConexion, setResultadoConexion] = useState<ConfiguracionProbarConexion | null>(null);
 
   function cargarEnviosPendientes() {
     getEnviosPendientes()
@@ -70,8 +78,25 @@ export default function ConfiguracionPage() {
     setIntrackeadosDismissed(true);
   }
 
+  async function handleProbarConexion() {
+    setProbando(true);
+    setResultadoConexion(null);
+    try {
+      setResultadoConexion(await probarConexion(proveedor));
+    } catch {
+      setResultadoConexion({
+        configurado: true, smtp_ok: false, imap_ok: false,
+        smtp_error: null, imap_error: null,
+        error: "No se pudo probar la conexión (error de red o servidor).",
+      });
+    } finally {
+      setProbando(false);
+    }
+  }
+
   async function handleCambiarProveedor(nuevo: ProveedorEmail) {
     setProveedor(nuevo);
+    setResultadoConexion(null);
     setProveedorStatus("Guardando...");
     try {
       await updateProveedorActivo(nuevo);
@@ -88,6 +113,7 @@ export default function ConfiguracionPage() {
       const data = await updateConfiguracionYahoo(yahooEmail, yahooPassword);
       setYahooConfigurado(data.configurado);
       setYahooPassword("");
+      setResultadoConexion(null);
       setYahooStatus("Guardado correctamente");
     } catch (e: unknown) {
       setYahooStatus(e instanceof Error ? e.message : "Error");
@@ -100,6 +126,7 @@ export default function ConfiguracionPage() {
       const data = await updateConfiguracionGmail(gmailEmail, gmailPassword);
       setGmailConfigurado(data.configurado);
       setGmailPassword("");
+      setResultadoConexion(null);
       setGmailStatus("Guardado correctamente");
     } catch (e: unknown) {
       setGmailStatus(e instanceof Error ? e.message : "Error");
@@ -114,8 +141,37 @@ export default function ConfiguracionPage() {
       </div>
 
       {(proveedor === "yahoo" ? yahooConfigurado : gmailConfigurado) && (
-        <div className="max-w-sm rounded-md bg-success px-3 py-2 text-sm text-success-foreground">
-          Mail activo: {proveedor === "yahoo" ? yahooEmail : gmailEmail}
+        <div className="max-w-sm space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-foreground">
+              Credenciales guardadas:{" "}
+              <span className="font-medium">{proveedor === "yahoo" ? yahooEmail : gmailEmail}</span>
+            </span>
+            <Button size="sm" variant="outline" onClick={handleProbarConexion} disabled={probando}>
+              {probando ? "Probando..." : "Probar conexión"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Guardadas no significa verificadas. Probá la conexión para confirmar que el login realmente funciona.
+          </p>
+          {resultadoConexion && (
+            resultadoConexion.error || !resultadoConexion.configurado ? (
+              <p className="rounded bg-destructive/10 px-2 py-1.5 text-xs text-destructive-text">
+                {resultadoConexion.error ?? "No hay credenciales guardadas para este proveedor."}
+              </p>
+            ) : (
+              <div className="space-y-1 rounded bg-background/60 px-2 py-1.5 text-xs">
+                <div className={resultadoConexion.smtp_ok ? "text-success-text" : "text-destructive-text"}>
+                  {resultadoConexion.smtp_ok ? "✓" : "✗"} Envío (SMTP)
+                  {resultadoConexion.smtp_ok ? " — conecta" : `: ${resultadoConexion.smtp_error ?? "no conecta"}`}
+                </div>
+                <div className={resultadoConexion.imap_ok ? "text-success-text" : "text-destructive-text"}>
+                  {resultadoConexion.imap_ok ? "✓" : "✗"} Lectura (IMAP)
+                  {resultadoConexion.imap_ok ? " — conecta" : `: ${resultadoConexion.imap_error ?? "no conecta"}`}
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
 

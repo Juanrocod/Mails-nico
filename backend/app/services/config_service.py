@@ -1,14 +1,19 @@
+import imaplib
 import logging
+import smtplib
+import ssl
 from datetime import datetime, timezone
 
 from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.email_providers import PROVIDERS, DEFAULT_PROVIDER
+from app.core.email_providers import PROVIDERS, DEFAULT_PROVIDER, ProviderConfig
 from app.models.configuracion_sistema import ConfiguracionSistema
 
 _logger = logging.getLogger("mails_nico.config")
+
+_CONEXION_TIMEOUT_SECONDS = 15  # login colgado no debe trabar la request entera
 
 
 def _fernet() -> Fernet:
@@ -99,3 +104,55 @@ def get_active_credentials(db: Session) -> tuple[str, str]:
     if get_active_provider(db) == "gmail":
         return get_gmail_credentials(db)
     return get_yahoo_credentials(db)
+
+
+def _probar_smtp(provider: ProviderConfig, email: str, password: str) -> tuple[bool, str | None]:
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(provider.smtp_host, provider.smtp_port, timeout=_CONEXION_TIMEOUT_SECONDS) as server:
+            server.starttls(context=context)
+            server.login(email, password)
+        return True, None
+    except Exception as exc:  # noqa: BLE001 — cualquier fallo de red/auth es un "no conecta"
+        return False, str(exc)[:300]
+
+
+def _probar_imap(provider: ProviderConfig, email: str, password: str) -> tuple[bool, str | None]:
+    server = None
+    try:
+        server = imaplib.IMAP4_SSL(provider.imap_host, provider.imap_port, timeout=_CONEXION_TIMEOUT_SECONDS)
+        server.login(email, password)
+        return True, None
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)[:300]
+    finally:
+        if server is not None:
+            try:
+                server.logout()
+            except Exception:  # noqa: BLE001 — cerrar es best-effort
+                pass
+
+
+def probar_conexion(db: Session, proveedor: str) -> dict:
+    """Verifica de verdad que las credenciales guardadas del proveedor logueen
+    contra SMTP e IMAP. No envía ni lee mails; solo abre y cierra la sesión."""
+    provider = PROVIDERS.get(proveedor)
+    if provider is None:
+        return {"configurado": False, "smtp_ok": False, "imap_ok": False,
+                "error": f"Proveedor desconocido: {proveedor}"}
+
+    config = load_config(db)
+    if proveedor == "gmail":
+        email, encrypted = config.gmail_email, config.gmail_app_password_encrypted
+    else:
+        email, encrypted = config.yahoo_email, config.yahoo_app_password_encrypted
+
+    if not (email and encrypted):
+        return {"configurado": False, "smtp_ok": False, "imap_ok": False,
+                "error": "No hay credenciales guardadas para este proveedor."}
+
+    password = decrypt(encrypted)
+    smtp_ok, smtp_error = _probar_smtp(provider, email, password)
+    imap_ok, imap_error = _probar_imap(provider, email, password)
+    return {"configurado": True, "smtp_ok": smtp_ok, "imap_ok": imap_ok,
+            "smtp_error": smtp_error, "imap_error": imap_error}

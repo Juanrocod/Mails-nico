@@ -14,6 +14,8 @@ from app.schemas.configuracion import (
     ConfiguracionProveedorRequest,
     ConfiguracionProveedorResponse,
     ConfiguracionEnviosPendientesResponse,
+    ConfiguracionProbarConexionRequest,
+    ConfiguracionProbarConexionResponse,
 )
 from app.services import config_service
 
@@ -118,3 +120,15 @@ def get_envios_pendientes(
         intrackeados_otro_proveedor=intrackeados_otro_proveedor,
         otro_proveedor_email=otro_proveedor_email,
     )
+
+
+@router.post("/probar-conexion", response_model=ConfiguracionProbarConexionResponse)
+def probar_conexion(
+    body: ConfiguracionProbarConexionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Hace login real SMTP+IMAP con las credenciales guardadas del proveedor
+    indicado. Endpoint sincrónico (corre en threadpool) para no bloquear el loop."""
+    resultado = config_service.probar_conexion(db, body.proveedor)
+    return ConfiguracionProbarConexionResponse(**resultado)

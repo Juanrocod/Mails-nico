@@ -38,3 +38,16 @@ class ConfiguracionEnviosPendientesResponse(BaseModel):
     pendientes_proveedor_activo: int
     intrackeados_otro_proveedor: int
     otro_proveedor_email: Optional[str] = None
+
+
+class ConfiguracionProbarConexionRequest(BaseModel):
+    proveedor: Literal["yahoo", "gmail"]
+
+
+class ConfiguracionProbarConexionResponse(BaseModel):
+    configurado: bool
+    smtp_ok: bool
+    imap_ok: bool
+    smtp_error: Optional[str] = None
+    imap_error: Optional[str] = None
+    error: Optional[str] = None

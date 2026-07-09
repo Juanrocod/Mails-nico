@@ -92,3 +92,38 @@ def test_get_active_credentials_usa_gmail_cuando_esta_activo(db):
     email, password = config_service.get_active_credentials(db)
     assert email == "cliente@gmail.com"
     assert password == "app-password-gmail"
+
+
+def test_probar_conexion_sin_credenciales_reporta_no_configurado(db):
+    resultado = config_service.probar_conexion(db, "yahoo")
+    assert resultado["configurado"] is False
+    assert resultado["smtp_ok"] is False
+    assert resultado["imap_ok"] is False
+
+
+def test_probar_conexion_proveedor_desconocido(db):
+    resultado = config_service.probar_conexion(db, "outlook")
+    assert resultado["configurado"] is False
+    assert "desconocido" in resultado["error"].lower()
+
+
+def test_probar_conexion_login_ok(db, monkeypatch):
+    config_service.save_yahoo_credentials(db, "cliente@yahoo.com", "app-password-123")
+    monkeypatch.setattr(config_service, "_probar_smtp", lambda *a: (True, None))
+    monkeypatch.setattr(config_service, "_probar_imap", lambda *a: (True, None))
+    resultado = config_service.probar_conexion(db, "yahoo")
+    assert resultado == {
+        "configurado": True, "smtp_ok": True, "imap_ok": True,
+        "smtp_error": None, "imap_error": None,
+    }
+
+
+def test_probar_conexion_login_falla_reporta_error(db, monkeypatch):
+    config_service.save_yahoo_credentials(db, "cliente@yahoo.com", "clave-mala")
+    monkeypatch.setattr(config_service, "_probar_smtp", lambda *a: (False, "535 auth failed"))
+    monkeypatch.setattr(config_service, "_probar_imap", lambda *a: (False, "AUTHENTICATIONFAILED"))
+    resultado = config_service.probar_conexion(db, "yahoo")
+    assert resultado["configurado"] is True
+    assert resultado["smtp_ok"] is False
+    assert resultado["imap_ok"] is False
+    assert "535" in resultado["smtp_error"]

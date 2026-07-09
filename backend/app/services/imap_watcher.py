@@ -4,6 +4,8 @@ import imaplib
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import text
+
 from app.core.database import SessionLocal
 from app.core.email_providers import PROVIDERS
 from app.models.envio import Envio, EstadoEnvio
@@ -15,6 +17,13 @@ _POLL_INTERVAL = 600  # 10 minutos
 _SEARCH_WINDOW_DAYS = 30  # cuanto atras se consideran los Envios "activos" para trackear
 _IMAP_TIMEOUT_SECONDS = 15  # evita que una conexion colgada trabe el poll entero
 
+# Con >1 worker de gunicorn, el startup corre en CADA worker, asi que sin este
+# lock habria N watchers polleando Yahoo en paralelo (doble/triple conexion IMAP
+# cada 10 min + clasificacion repetida). Un advisory lock de Postgres deja que
+# solo un worker sea el "lider" que pollea; los demas saltan su turno. En SQLite
+# (dev/tests) no hay advisory locks: siempre corre (un solo proceso de todos modos).
+_WATCHER_LOCK_KEY = 4827193
+
 
 async def run_forever():
     """
@@ -23,10 +32,31 @@ async def run_forever():
     """
     while True:
         try:
-            await asyncio.get_event_loop().run_in_executor(None, _poll_inbox)
+            await asyncio.get_event_loop().run_in_executor(None, _poll_como_lider)
         except Exception as exc:
             _logger.error("IMAP poll error: %s", exc)
         await asyncio.sleep(_POLL_INTERVAL)
+
+
+def _es_lider_del_watcher(db) -> bool:
+    """True si este worker consigue el advisory lock (o si la DB no es Postgres).
+    El lock se mantiene mientras viva la sesion `db` y se libera al cerrarla."""
+    if db.bind.dialect.name != "postgresql":
+        return True
+    return bool(db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": _WATCHER_LOCK_KEY}).scalar())
+
+
+def _poll_como_lider() -> None:
+    """Envuelve el poll del loop de background con el lock de lider, para que un
+    solo worker pollee. El refresco manual NO pasa por aca: siempre corre a demanda."""
+    lock_db = SessionLocal()
+    try:
+        if not _es_lider_del_watcher(lock_db):
+            _logger.debug("Otro worker es el lider del watcher IMAP; salteo este turno")
+            return
+        _poll_inbox()
+    finally:
+        lock_db.close()  # libera el advisory lock si lo tenia
 
 
 def _poll_inbox(mailbox_lookback_days: int = _SEARCH_WINDOW_DAYS):

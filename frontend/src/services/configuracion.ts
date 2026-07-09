@@ -5,6 +5,7 @@ import type {
   ConfiguracionProveedor,
   ProveedorEmail,
   ConfiguracionEnviosPendientes,
+  ConfiguracionProbarConexion,
 } from "../types/domain";
 
 export async function getConfiguracionYahoo(): Promise<ConfiguracionYahoo> {
@@ -73,5 +74,18 @@ export async function updateProveedorActivo(proveedor: ProveedorEmail): Promise<
 export async function getEnviosPendientes(): Promise<ConfiguracionEnviosPendientes> {
   const r = await apiFetch("/configuracion/envios-pendientes");
   if (!r.ok) throw new Error("Error cargando envios pendientes");
+  return r.json();
+}
+
+export async function probarConexion(proveedor: ProveedorEmail): Promise<ConfiguracionProbarConexion> {
+  const r = await apiFetch("/configuracion/probar-conexion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proveedor }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Error probando la conexión");
+  }
   return r.json();
 }

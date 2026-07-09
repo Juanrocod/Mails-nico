@@ -52,6 +52,14 @@ export function EnvioDrawer({ envio, onClose, onMarcarPago }: Props) {
                 )}
               </section>
 
+              {envio.estado === "PAGO" && envio.tiene_adjunto && (
+                <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-text">
+                  Marcado como <strong>pago automáticamente</strong> porque la respuesta traía un adjunto
+                  (probable comprobante). No es una confirmación de acreditación: revisá el adjunto antes de
+                  darlo por cobrado.
+                </div>
+              )}
+
               {envio.reply_snippet && (
                 <>
                   <Separator />

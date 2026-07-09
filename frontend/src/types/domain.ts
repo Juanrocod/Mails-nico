@@ -94,6 +94,15 @@ export interface ConfiguracionEnviosPendientes {
   otro_proveedor_email: string | null;
 }
 
+export interface ConfiguracionProbarConexion {
+  configurado: boolean;
+  smtp_ok: boolean;
+  imap_ok: boolean;
+  smtp_error: string | null;
+  imap_error: string | null;
+  error: string | null;
+}
+
 export interface DashboardResumen {
   hay_ciclo_activo: boolean;
   deuda_total: number;
