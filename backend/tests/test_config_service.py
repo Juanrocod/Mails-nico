@@ -118,6 +118,25 @@ def test_probar_conexion_login_ok(db, monkeypatch):
     }
 
 
+def test_probar_conexion_credenciales_indescifrables_no_explota(db, monkeypatch):
+    # Simula credenciales cifradas con OTRA ENCRYPTION_KEY (ej. branch dev que
+    # copio datos de prod): decrypt tira InvalidToken -> mensaje claro, no 500.
+    config = config_service.load_config(db)
+    config.yahoo_email = "cliente@yahoo.com"
+    config.yahoo_app_password_encrypted = "token-cifrado-con-otra-key"
+    db.commit()
+
+    def _decrypt_falla(_value):
+        raise ValueError("InvalidToken")
+
+    monkeypatch.setattr(config_service, "decrypt", _decrypt_falla)
+    resultado = config_service.probar_conexion(db, "yahoo")
+    assert resultado["configurado"] is True
+    assert resultado["smtp_ok"] is False
+    assert resultado["imap_ok"] is False
+    assert "descifrar" in resultado["error"].lower()
+
+
 def test_probar_conexion_login_falla_reporta_error(db, monkeypatch):
     config_service.save_yahoo_credentials(db, "cliente@yahoo.com", "clave-mala")
     monkeypatch.setattr(config_service, "_probar_smtp", lambda *a: (False, "535 auth failed"))

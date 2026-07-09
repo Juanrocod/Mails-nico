@@ -34,7 +34,8 @@ async def run_forever():
         try:
             await asyncio.get_event_loop().run_in_executor(None, _poll_como_lider)
         except Exception as exc:
-            _logger.error("IMAP poll error: %s", exc)
+            # %r y el tipo: algunas excepciones (ej. InvalidToken) tienen str() vacio
+            _logger.error("IMAP poll error: %s: %r", type(exc).__name__, exc)
         await asyncio.sleep(_POLL_INTERVAL)
 
 

@@ -151,7 +151,12 @@ def probar_conexion(db: Session, proveedor: str) -> dict:
         return {"configurado": False, "smtp_ok": False, "imap_ok": False,
                 "error": "No hay credenciales guardadas para este proveedor."}
 
-    password = decrypt(encrypted)
+    try:
+        password = decrypt(encrypted)
+    except Exception:  # noqa: BLE001 — token cifrado con otra ENCRYPTION_KEY, dato corrupto, etc.
+        return {"configurado": True, "smtp_ok": False, "imap_ok": False,
+                "error": "No se pudieron descifrar las credenciales guardadas "
+                         "(probablemente cambió la ENCRYPTION_KEY). Volvé a guardarlas en Configuración."}
     smtp_ok, smtp_error = _probar_smtp(provider, email, password)
     imap_ok, imap_error = _probar_imap(provider, email, password)
     return {"configurado": True, "smtp_ok": smtp_ok, "imap_ok": imap_ok,
