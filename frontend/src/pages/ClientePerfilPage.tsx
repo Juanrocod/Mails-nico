@@ -161,7 +161,7 @@ export default function ClientePerfilPage() {
       {serieDeuda.length > 1 && (
         <div className="rounded-md border border-border p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Evolución de su deuda</p>
-          <EvolucionChart data={serieDeuda} />
+          <EvolucionChart data={serieDeuda} tipo="stepAfter" />
         </div>
       )}
 

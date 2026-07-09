@@ -22,7 +22,13 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
   );
 }
 
-export function EvolucionChart({ data }: { data: { label: string; valor: number }[] }) {
+export function EvolucionChart({
+  data,
+  tipo = "monotone",
+}: {
+  data: { label: string; valor: number }[];
+  tipo?: "monotone" | "stepAfter";
+}) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -48,7 +54,7 @@ export function EvolucionChart({ data }: { data: { label: string; valor: number 
         />
         <Tooltip content={(props) => <ChartTooltip {...props} />} cursor={{ stroke: "oklch(var(--border))" }} />
         <Area
-          type="stepAfter"
+          type={tipo}
           dataKey="valor"
           stroke="oklch(var(--primary))"
           strokeWidth={2}
